@@ -1,0 +1,26 @@
+# Node / Next.js
+node_modules/
+.next/
+out/
+*.log
+
+# Env / secrets
+.env
+.env.local
+.env.*.local
+
+# Generated graph artifacts — rebuild with `python3 preprocess/build_graph.py`
+data/
+
+# OS
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+
+# Claude harness state
+.claude/
+
+# Unrelated project
+silent-spaces/

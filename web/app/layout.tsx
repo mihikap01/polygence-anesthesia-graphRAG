@@ -1,0 +1,20 @@
+import type { Metadata } from "next";
+import "./globals.css";
+
+export const metadata: Metadata = {
+  title: "Polygence GraphRAG — Pharmacogenomic Reasoning",
+  description:
+    "Interactive biomedical knowledge graph for pharmacogenomic and anesthesia-related risk reasoning.",
+};
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <html lang="en">
+      <body className="h-screen overflow-hidden antialiased">{children}</body>
+    </html>
+  );
+}
