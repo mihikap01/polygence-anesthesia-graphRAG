@@ -85,4 +85,12 @@ export const cytoscapeStyle: Stylesheet[] = [
     selector: ".faded",
     style: { opacity: 0.12 },
   },
+  // Filter-driven visibility: applied/removed by GraphCanvas in response to
+  // changes in the left-sidebar filter state.  Using a class (not remove +
+  // re-add) preserves node positions so toggling a filter doesn't trigger
+  // a jarring re-layout.
+  {
+    selector: ".hidden",
+    style: { display: "none" } as any,
+  },
 ];
