@@ -1,15 +1,111 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { MessageSquare, Sparkles, Info, ExternalLink, Send } from "lucide-react";
+import {
+  MessageSquare, Sparkles, Info, ExternalLink, Send,
+  ChevronDown, ChevronRight, Copy, Check, FileText, MousePointerClick,
+} from "lucide-react";
 import { useStore } from "@/lib/store";
 import { cn } from "@/lib/cn";
+
+// ---------- Shared: Context viewer ------------------------------------------
+
+interface ContextSent {
+  systemPrompt: string;
+  userPrompt: string;
+  contextText: string;
+  subgraphSize?: { nodes: number; edges: number };
+  chars: number;
+}
+
+function formatBytes(n: number) {
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+  return `${(n / 1024 / 1024).toFixed(1)} MB`;
+}
+// Rough token estimate: ~3.7 chars/token for English.
+function estimateTokens(chars: number) {
+  return Math.round(chars / 3.7);
+}
+
+function ContextViewer({ context }: { context?: ContextSent }) {
+  const [open, setOpen] = useState(false);
+  const [tab, setTab] = useState<"context" | "system" | "user">("context");
+  const [copied, setCopied] = useState(false);
+  if (!context) return null;
+
+  const active =
+    tab === "system" ? context.systemPrompt :
+    tab === "user" ? context.userPrompt :
+    context.contextText;
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(active);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1200);
+    } catch {}
+  };
+
+  return (
+    <div className="mt-3 rounded-md border border-slate-700/50 bg-slate-900/40 overflow-hidden">
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className="w-full px-2.5 py-1.5 flex items-center justify-between text-[10px] text-slate-400 hover:bg-slate-800/40"
+      >
+        <span className="flex items-center gap-1.5">
+          {open ? <ChevronDown size={11}/> : <ChevronRight size={11}/>}
+          <FileText size={11}/>
+          <span className="font-semibold uppercase tracking-wider">Context sent to model</span>
+        </span>
+        <span className="flex items-center gap-2 font-mono tabular-nums">
+          <span>{formatBytes(context.chars)}</span>
+          <span className="opacity-50">·</span>
+          <span>~{estimateTokens(context.chars).toLocaleString()} tok</span>
+          {context.subgraphSize && (
+            <>
+              <span className="opacity-50">·</span>
+              <span>{context.subgraphSize.nodes}n·{context.subgraphSize.edges}e</span>
+            </>
+          )}
+        </span>
+      </button>
+      {open && (
+        <div className="border-t border-slate-700/50">
+          <div className="flex border-b border-slate-800/60 text-[10px]">
+            {(["context", "system", "user"] as const).map((t) => (
+              <button
+                key={t}
+                onClick={() => setTab(t)}
+                className={cn(
+                  "px-2.5 py-1.5 font-medium uppercase tracking-wider transition-colors",
+                  tab === t ? "text-blue-300 bg-slate-800/60" : "text-slate-500 hover:text-slate-300"
+                )}
+              >
+                {t === "context" ? "Graph context" : t === "system" ? "System prompt" : "User prompt"}
+              </button>
+            ))}
+            <div className="ml-auto flex items-center pr-1">
+              <button onClick={copy}
+                      className="px-2 py-1 text-[10px] text-slate-400 hover:text-white flex items-center gap-1">
+                {copied ? <><Check size={11}/> copied</> : <><Copy size={11}/> copy</>}
+              </button>
+            </div>
+          </div>
+          <pre className="text-[10.5px] leading-relaxed text-slate-300 p-2.5 max-h-72 overflow-auto font-mono whitespace-pre-wrap break-words">
+{active}
+          </pre>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function RightSidebar() {
   const tab = useStore((s) => s.rightTab);
   const setTab = useStore((s) => s.setRightTab);
   return (
-    <aside className="w-[360px] shrink-0 h-full flex flex-col card border-l border-y-0 border-r-0">
+    <aside className="w-[400px] shrink-0 h-full flex flex-col card border-l border-y-0 border-r-0">
       <div className="flex border-b border-slate-800/60">
         <TabBtn active={tab === "explain"} onClick={() => setTab("explain")}>
           <Sparkles size={13}/> Explain
@@ -17,6 +113,25 @@ export default function RightSidebar() {
         <TabBtn active={tab === "chat"} onClick={() => setTab("chat")}>
           <MessageSquare size={13}/> Chat
         </TabBtn>
+      </div>
+      <div className="px-3 py-2 border-b border-slate-800/60 bg-slate-900/30">
+        {tab === "explain" ? (
+          <div className="flex items-start gap-2 text-[10.5px] text-slate-400 leading-snug">
+            <MousePointerClick size={12} className="mt-0.5 shrink-0 text-blue-400/80"/>
+            <span>
+              <span className="text-slate-200 font-medium">Click-driven.</span>{" "}
+              Select any node or edge on the canvas — Claude explains it using its 2-hop graph neighbourhood.
+            </span>
+          </div>
+        ) : (
+          <div className="flex items-start gap-2 text-[10.5px] text-slate-400 leading-snug">
+            <MessageSquare size={12} className="mt-0.5 shrink-0 text-blue-400/80"/>
+            <span>
+              <span className="text-slate-200 font-medium">Question-driven.</span>{" "}
+              Type a question — GraphRAG entity-links it to the graph, retrieves paths, then Claude answers.
+            </span>
+          </div>
+        )}
       </div>
       <div className="flex-1 overflow-hidden">
         {tab === "explain" ? <ExplainPanel /> : <ChatPanel />}
@@ -46,11 +161,16 @@ function ExplainPanel() {
   const edge = useStore((s) => s.selectedEdge);
   const [explanation, setExplanation] = useState<string>("");
   const [evidence, setEvidence] = useState<any>(null);
+  const [contextSent, setContextSent] = useState<ContextSent | undefined>(undefined);
+  const [ai, setAi] = useState<any>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!node && !edge) { setExplanation(""); setEvidence(null); setError(null); return; }
+    if (!node && !edge) {
+      setExplanation(""); setEvidence(null); setContextSent(undefined);
+      setAi(null); setError(null); return;
+    }
     setBusy(true);
     setError(null);
     const body = node
@@ -66,6 +186,8 @@ function ExplainPanel() {
         if (!r.ok) throw new Error(j.error || "Failed");
         setExplanation(j.explanation || "");
         setEvidence(j.evidence || null);
+        setContextSent(j.contextSent);
+        setAi(j.ai);
       })
       .catch((e) => setError(String(e.message ?? e)))
       .finally(() => setBusy(false));
@@ -73,8 +195,16 @@ function ExplainPanel() {
 
   if (!node && !edge) {
     return (
-      <div className="p-4 text-xs text-slate-400 flex items-center gap-2">
-        <Info size={14} /> Click a node or edge to see a graph-grounded explanation.
+      <div className="h-full flex flex-col items-center justify-center text-center p-6 text-slate-400">
+        <MousePointerClick size={28} className="text-slate-600 mb-3"/>
+        <div className="text-xs font-medium text-slate-300 mb-1">Nothing selected yet</div>
+        <div className="text-[11px] text-slate-500 leading-snug max-w-[260px]">
+          Click any <span className="text-slate-300">node</span> or <span className="text-red-400">edge</span> on the
+          graph to the left — Claude will explain it using its 2-hop graph neighbourhood.
+        </div>
+        <div className="text-[10px] text-slate-600 mt-3">
+          For freeform questions, switch to the <span className="text-slate-400">Chat</span> tab.
+        </div>
       </div>
     );
   }
@@ -115,6 +245,13 @@ function ExplainPanel() {
         {error && <div className="text-red-400">{error}</div>}
         {!busy && !error && (
           <>
+            {ai?.provider && ai.provider !== "none" && (
+              <div className="text-[10px] text-slate-500 mb-2 font-mono">
+                {ai.provider}
+                {ai.duration_ms ? ` · ${(ai.duration_ms / 1000).toFixed(1)}s` : ""}
+                {ai.cost_usd ? ` · $${ai.cost_usd.toFixed(3)}` : ""}
+              </div>
+            )}
             <p className="whitespace-pre-wrap text-slate-200">{explanation}</p>
             {evidence?.pmids?.length > 0 && (
               <div className="mt-3">
@@ -144,6 +281,7 @@ function ExplainPanel() {
                 </div>
               </div>
             )}
+            <ContextViewer context={contextSent} />
           </>
         )}
       </div>
@@ -160,7 +298,94 @@ function labelForNodeType(t: string) {
 
 // ---------- Chat ------------------------------------------------------------
 
-interface ChatMsg { role: "user" | "assistant"; content: string; citations?: any }
+interface RetrievalEntity { id: string; label: string; type: string; matchedTerm: string; score: number }
+interface RetrievalPath {
+  fromId: string; toId: string; hops: number; critical: boolean;
+  nodes: Array<{ id: string; label: string; type: string }>;
+  edges: Array<{ id: string; type: string; level?: string; critical?: boolean }>;
+}
+interface ChatRetrieval {
+  entities: RetrievalEntity[];
+  paths: RetrievalPath[];
+  subgraphSize: { nodes: number; edges: number };
+}
+interface ChatMsg {
+  role: "user" | "assistant";
+  content: string;
+  citations?: any;
+  retrieval?: ChatRetrieval;
+  contextSent?: ContextSent;
+  ai?: { provider?: string; duration_ms?: number; cost_usd?: number };
+}
+
+const ENTITY_COLOR: Record<string, string> = {
+  drug: "#3b82f6", gene: "#ec4899", variant_cluster: "#f97316",
+  drug_class: "#a855f7", phenotype: "#eab308",
+};
+
+function RetrievalStrip({ r, ai }: { r: ChatRetrieval; ai?: ChatMsg["ai"] }) {
+  if (!r) return null;
+  const hasContent = r.entities.length > 0 || r.paths.length > 0;
+  if (!hasContent) {
+    return (
+      <div className="text-[10px] text-slate-500 mb-2 italic">
+        no graph entities matched — answering from visible context only
+      </div>
+    );
+  }
+  return (
+    <div className="mb-2 pb-2 border-b border-slate-700/40">
+      <div className="text-[9px] uppercase tracking-wider text-slate-500 font-semibold mb-1 flex items-center gap-2">
+        <span>GraphRAG retrieved</span>
+        {ai?.provider && ai.provider !== "none" && ai.provider !== "error" && (
+          <span className="text-slate-600 normal-case tracking-normal font-normal">
+            · {ai.provider}
+            {ai.duration_ms ? ` · ${(ai.duration_ms / 1000).toFixed(1)}s` : ""}
+            {ai.cost_usd ? ` · $${ai.cost_usd.toFixed(3)}` : ""}
+          </span>
+        )}
+      </div>
+      {r.entities.length > 0 && (
+        <div className="flex flex-wrap gap-1 mb-1.5">
+          {r.entities.map((e) => (
+            <span key={e.id} className="chip text-[10px]"
+                  title={`matched "${e.matchedTerm}" · score ${e.score.toFixed(2)}`}>
+              <span style={{ background: ENTITY_COLOR[e.type] || "#64748b" }}
+                    className="w-1.5 h-1.5 rounded-full inline-block" />
+              {e.label}
+            </span>
+          ))}
+        </div>
+      )}
+      {r.paths.length > 0 && (
+        <div className="space-y-0.5">
+          <div className="text-[9px] uppercase tracking-wider text-slate-500 font-semibold mt-1.5">
+            paths ({r.paths.length})
+          </div>
+          {r.paths.slice(0, 4).map((p, i) => (
+            <div key={i} className={cn(
+              "text-[10px] leading-tight flex items-center gap-1 font-mono",
+              p.critical ? "text-red-300" : "text-slate-400"
+            )}>
+              <span className="opacity-60">[{p.hops}h{p.critical ? "·!" : ""}]</span>
+              <span className="truncate">
+                {p.nodes.map((n, j) => (
+                  <span key={j}>
+                    {j > 0 && <span className="mx-0.5 opacity-40">→</span>}
+                    {n.label}
+                  </span>
+                ))}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+      <div className="text-[9px] text-slate-600 mt-1.5">
+        subgraph: {r.subgraphSize.nodes} nodes · {r.subgraphSize.edges} edges
+      </div>
+    </div>
+  );
+}
 
 function ChatPanel() {
   const node = useStore((s) => s.selectedNode);
@@ -196,6 +421,9 @@ function ChatPanel() {
         role: "assistant",
         content: j.answer || j.error || "(no answer)",
         citations: j.citations,
+        retrieval: j.retrieval,
+        contextSent: j.contextSent,
+        ai: j.ai,
       }]);
     } catch (e: any) {
       setMessages((m) => [...m, { role: "assistant", content: `Error: ${e?.message ?? e}` }]);
@@ -210,11 +438,14 @@ function ChatPanel() {
         {messages.map((m, i) => (
           <div key={i} className={cn("text-xs leading-relaxed", m.role === "user" ? "text-right" : "")}>
             <div className={cn(
-              "inline-block max-w-[92%] px-3 py-2 rounded-lg",
+              "inline-block max-w-[92%] px-3 py-2 rounded-lg text-left",
               m.role === "user"
                 ? "bg-blue-600/30 border border-blue-500/30 text-blue-50"
                 : "bg-slate-800/70 border border-slate-700/60 text-slate-200"
             )}>
+              {m.role === "assistant" && m.retrieval && (
+                <RetrievalStrip r={m.retrieval} ai={m.ai} />
+              )}
               <div className="whitespace-pre-wrap">{m.content}</div>
               {m.citations?.pmids?.length > 0 && (
                 <div className="mt-2 flex flex-wrap gap-1">
@@ -224,6 +455,9 @@ function ChatPanel() {
                        className="chip text-[10px] hover:bg-slate-700/80">{p}</a>
                   ))}
                 </div>
+              )}
+              {m.role === "assistant" && m.contextSent && (
+                <ContextViewer context={m.contextSent} />
               )}
             </div>
           </div>

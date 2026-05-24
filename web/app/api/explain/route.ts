@@ -1,10 +1,13 @@
-// /api/explain — generates a graph-grounded explanation for a node or edge.
-// Falls back to a deterministic template if no OPENAI_API_KEY is configured.
+// /api/explain — graph-grounded explanation for a node or edge.
+//
+// LLM provider chosen by env LLM_PROVIDER (claude-cli | openai | none).
+// "none" falls back to a deterministic context dump so the retrieval layer
+// is verifiable even without credentials.
 
 import { NextResponse } from "next/server";
 import { getFullGraph } from "@/lib/graph/loader";
 import { nodeContext, edgeContext } from "@/lib/graph/retrieve";
-import { getOpenAI, MODEL } from "@/lib/llm/openai";
+import { ask } from "@/lib/llm";
 import { EXPLAIN_SYSTEM, buildExplainUserPrompt } from "@/lib/llm/prompts";
 
 export async function POST(req: Request) {
@@ -25,43 +28,48 @@ export async function POST(req: Request) {
     ctx = edgeContext(g, edge);
   }
 
-  const client = getOpenAI();
-  if (!client) {
-    return NextResponse.json({
-      explanation: templateExplanation(ctx.text, kind),
-      evidence: { pmids: ctx.pmids },
-      ai: "disabled",
-    });
-  }
+  const userPrompt = buildExplainUserPrompt(ctx.text, kind);
+  // What we expose to the UI so it can show the user *exactly* what was sent.
+  const contextSent = {
+    systemPrompt: EXPLAIN_SYSTEM,
+    userPrompt,
+    contextText: ctx.text,
+    subgraphSize: { nodes: ctx.subgraph.nodes.length, edges: ctx.subgraph.edges.length },
+    chars: userPrompt.length + EXPLAIN_SYSTEM.length,
+  };
 
   try {
-    const resp = await client.chat.completions.create({
-      model: MODEL,
-      temperature: 0.2,
-      messages: [
-        { role: "system", content: EXPLAIN_SYSTEM },
-        { role: "user", content: buildExplainUserPrompt(ctx.text, kind) },
-      ],
+    const out = await ask({
+      systemPrompt: EXPLAIN_SYSTEM,
+      userPrompt,
     });
-    const explanation = resp.choices[0]?.message?.content ?? "";
+    if (!out) {
+      return NextResponse.json({
+        explanation: templateExplanation(ctx.text, kind),
+        evidence: { pmids: ctx.pmids },
+        contextSent,
+        ai: { provider: "none" },
+      });
+    }
     return NextResponse.json({
-      explanation,
+      explanation: out.text,
       evidence: { pmids: ctx.pmids },
-      ai: "ok",
+      contextSent,
+      ai: { provider: out.provider, cost_usd: out.cost_usd, duration_ms: out.duration_ms },
     });
   } catch (e: any) {
     return NextResponse.json({
       explanation: templateExplanation(ctx.text, kind),
       evidence: { pmids: ctx.pmids },
-      ai: "error",
-      error: String(e?.message ?? e),
+      contextSent,
+      ai: { provider: "error", error: String(e?.message ?? e) },
     });
   }
 }
 
 function templateExplanation(text: string, kind: "node" | "edge"): string {
   return (
-    `(AI disabled — set OPENAI_API_KEY to enable graph-aware reasoning.)\n\n` +
+    `(LLM disabled — set LLM_PROVIDER=claude-cli or LLM_PROVIDER=openai to enable graph-aware reasoning.)\n\n` +
     `Local context for this ${kind}:\n\n${text}`
   );
 }
