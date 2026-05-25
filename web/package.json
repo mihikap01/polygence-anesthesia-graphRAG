@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "next lint",
     "build:firebase": "node scripts/build-firebase.mjs",
-    "deploy:firebase": "npm run build:firebase && (cd .. && firebase deploy --only hosting)"
+    "deploy:firebase": "node scripts/deploy-firebase.mjs",
+    "set-secret:gemini": "cd .. && firebase functions:secrets:set GEMINI_KEY"
   },
   "dependencies": {
     "next": "14.2.5",

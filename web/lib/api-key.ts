@@ -3,7 +3,7 @@
 // User-supplied API key, stored in localStorage.
 // Only used in the BYOK (static Firebase) build — local dev never touches this.
 
-export type ByokProvider = "openai" | "anthropic";
+export type ByokProvider = "openai" | "anthropic" | "deepseek" | "gemini";
 
 const KEY_STORAGE = "polygence:llm:key";
 const PROVIDER_STORAGE = "polygence:llm:provider";
@@ -17,9 +17,14 @@ export function isBYOK(): boolean {
   return process.env.NEXT_PUBLIC_BYOK === "1";
 }
 
-/** Heuristic: pick provider from key prefix when not explicitly set. */
+/** Heuristic: pick provider from key prefix when not explicitly set.
+ *  DeepSeek keys look like sk-{32 hex} — same prefix as OpenAI, so we can't
+ *  reliably auto-detect; leave it to the explicit provider toggle. */
 export function detectProvider(key: string): ByokProvider | null {
   if (key.startsWith("sk-ant-")) return "anthropic";
+  if (key.startsWith("AIza")) return "gemini";
+  if (key.startsWith("sk-") && key.length === 35 && /^sk-[a-f0-9]{32}$/.test(key))
+    return "deepseek";
   if (key.startsWith("sk-")) return "openai";
   return null;
 }

@@ -1,0 +1,13 @@
+{
+  "name": "polygence-graphrag-functions",
+  "private": true,
+  "main": "index.js",
+  "engines": { "node": "20" },
+  "scripts": {
+    "serve": "firebase emulators:start --only functions",
+    "deploy": "firebase deploy --only functions"
+  },
+  "dependencies": {
+    "firebase-functions": "^5.0.1"
+  }
+}

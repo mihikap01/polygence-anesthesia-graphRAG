@@ -17,7 +17,7 @@ interface Props {
 }
 
 export default function ApiKeyModal({ open, onClose, onSaved }: Props) {
-  const [provider, setProvider] = useState<ByokProvider>("anthropic");
+  const [provider, setProvider] = useState<ByokProvider>("gemini");
   const [key, setKey] = useState("");
   const [hasExisting, setHasExisting] = useState(false);
 
@@ -66,7 +66,7 @@ export default function ApiKeyModal({ open, onClose, onSaved }: Props) {
         <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800/60">
           <div className="flex items-center gap-2 text-sm font-semibold text-white">
             <KeyRound size={14} className="text-blue-400" />
-            Your LLM API key
+            Use your own API key (optional)
           </div>
           <button
             onClick={onClose}
@@ -79,12 +79,19 @@ export default function ApiKeyModal({ open, onClose, onSaved }: Props) {
 
         <div className="p-4 space-y-3 text-xs text-slate-300">
           <p className="leading-relaxed">
-            This demo runs Explain and Chat with your own key — it's stored only
+            By default, this demo answers via our hosted Gemini backend.
+            If you'd rather use your own key, paste it below — it's stored only
             in your browser's <code className="text-slate-100">localStorage</code> and
-            sent directly to the provider. We never see it.
+            sent directly to the provider you choose.
           </p>
 
-          <div className="flex gap-2">
+          <div className="grid grid-cols-2 gap-2">
+            <ProviderBtn
+              active={provider === "gemini"}
+              onClick={() => setProvider("gemini")}
+            >
+              Gemini
+            </ProviderBtn>
             <ProviderBtn
               active={provider === "anthropic"}
               onClick={() => setProvider("anthropic")}
@@ -96,6 +103,12 @@ export default function ApiKeyModal({ open, onClose, onSaved }: Props) {
               onClick={() => setProvider("openai")}
             >
               OpenAI
+            </ProviderBtn>
+            <ProviderBtn
+              active={provider === "deepseek"}
+              onClick={() => setProvider("deepseek")}
+            >
+              DeepSeek
             </ProviderBtn>
           </div>
 
@@ -110,7 +123,11 @@ export default function ApiKeyModal({ open, onClose, onSaved }: Props) {
               onChange={(e) => setKey(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && save()}
               placeholder={
-                provider === "anthropic" ? "sk-ant-…" : "sk-…"
+                provider === "anthropic"
+                  ? "sk-ant-…"
+                  : provider === "gemini"
+                  ? "AIza…"
+                  : "sk-…"
               }
               className="w-full px-3 py-2 text-xs font-mono rounded-md bg-slate-950/60 border border-slate-700/60 focus:border-blue-500/60 outline-none placeholder:text-slate-600"
             />
@@ -124,6 +141,24 @@ export default function ApiKeyModal({ open, onClose, onSaved }: Props) {
                   className="text-blue-400 hover:underline inline-flex items-center gap-0.5"
                 >
                   console.anthropic.com <ExternalLink size={9} />
+                </a>
+              ) : provider === "deepseek" ? (
+                <a
+                  href="https://platform.deepseek.com/api_keys"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-blue-400 hover:underline inline-flex items-center gap-0.5"
+                >
+                  platform.deepseek.com <ExternalLink size={9} />
+                </a>
+              ) : provider === "gemini" ? (
+                <a
+                  href="https://aistudio.google.com/apikey"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-blue-400 hover:underline inline-flex items-center gap-0.5"
+                >
+                  aistudio.google.com <ExternalLink size={9} />
                 </a>
               ) : (
                 <a

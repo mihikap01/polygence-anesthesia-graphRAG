@@ -1,8 +1,14 @@
 "use client";
 
-// Browser-side LLM provider. Calls OpenAI or Anthropic directly from the
-// user's browser using the user's own API key (stored in localStorage).
-// Only used in the BYOK static build — server routes stay untouched for local dev.
+// Browser-side LLM provider. Two paths:
+//
+//   1. proxyAsk()     → POST /api/llm (Firebase Cloud Function → Gemini).
+//                       Default when the user has not supplied a key.
+//                       Gemini key stays on the server.
+//
+//   2. browserAsk()   → direct browser → OpenAI / Anthropic / DeepSeek /
+//                       Gemini using the user's own key from localStorage
+//                       (modal override).
 
 import type { StoredKey } from "../api-key";
 
@@ -14,7 +20,7 @@ export interface BrowserAskInput {
 }
 
 export interface BrowserAskOutput {
-  provider: "openai" | "anthropic";
+  provider: "openai" | "anthropic" | "deepseek" | "gemini";
   text: string;
   duration_ms: number;
   model: string;
@@ -22,13 +28,92 @@ export interface BrowserAskOutput {
 
 const OPENAI_DEFAULT_MODEL = "gpt-4o-mini";
 const ANTHROPIC_DEFAULT_MODEL = "claude-haiku-4-5-20251001";
+const DEEPSEEK_DEFAULT_MODEL = "deepseek-chat";
+const GEMINI_DEFAULT_MODEL = "gemini-2.5-flash";
 
 export async function browserAsk(
   stored: StoredKey,
   input: BrowserAskInput
 ): Promise<BrowserAskOutput> {
   if (stored.provider === "openai") return askOpenAI(stored.key, input);
+  if (stored.provider === "deepseek") return askDeepSeek(stored.key, input);
+  if (stored.provider === "gemini") return askGemini(stored.key, input);
   return askAnthropic(stored.key, input);
+}
+
+async function askGemini(
+  apiKey: string,
+  input: BrowserAskInput
+): Promise<BrowserAskOutput> {
+  const model = input.model || GEMINI_DEFAULT_MODEL;
+  const t0 = Date.now();
+  // Gemini's OpenAI-compatible endpoint.
+  const r = await fetch(
+    "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model,
+        temperature: input.temperature ?? 0.2,
+        max_tokens: 1024,
+        messages: [
+          { role: "system", content: input.systemPrompt },
+          { role: "user", content: input.userPrompt },
+        ],
+      }),
+    }
+  );
+  if (!r.ok) {
+    const errText = await safeReadError(r);
+    throw new Error(`Gemini ${r.status}: ${errText}`);
+  }
+  const j = await r.json();
+  return {
+    provider: "gemini",
+    text: j.choices?.[0]?.message?.content ?? "",
+    duration_ms: Date.now() - t0,
+    model,
+  };
+}
+
+async function askDeepSeek(
+  apiKey: string,
+  input: BrowserAskInput
+): Promise<BrowserAskOutput> {
+  const model = input.model || DEEPSEEK_DEFAULT_MODEL;
+  const t0 = Date.now();
+  // DeepSeek's API is OpenAI-compatible.
+  const r = await fetch("https://api.deepseek.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model,
+      temperature: input.temperature ?? 0.2,
+      max_tokens: 1024,
+      messages: [
+        { role: "system", content: input.systemPrompt },
+        { role: "user", content: input.userPrompt },
+      ],
+    }),
+  });
+  if (!r.ok) {
+    const errText = await safeReadError(r);
+    throw new Error(`DeepSeek ${r.status}: ${errText}`);
+  }
+  const j = await r.json();
+  return {
+    provider: "deepseek",
+    text: j.choices?.[0]?.message?.content ?? "",
+    duration_ms: Date.now() - t0,
+    model,
+  };
 }
 
 async function askOpenAI(
@@ -104,6 +189,32 @@ async function askAnthropic(
     text,
     duration_ms: Date.now() - t0,
     model,
+  };
+}
+
+/** Call the Firebase Cloud Function proxy. The endpoint is rewritten in
+ *  firebase.json from /api/llm → ask(). The Gemini key lives server-side. */
+export async function proxyAsk(input: BrowserAskInput): Promise<BrowserAskOutput> {
+  const t0 = Date.now();
+  const r = await fetch("/api/llm", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      systemPrompt: input.systemPrompt,
+      userPrompt: input.userPrompt,
+      temperature: input.temperature ?? 0.2,
+    }),
+  });
+  if (!r.ok) {
+    const errText = await safeReadError(r);
+    throw new Error(`proxy ${r.status}: ${errText}`);
+  }
+  const j = await r.json();
+  return {
+    provider: j.provider ?? "gemini",
+    text: j.text ?? "",
+    model: j.model ?? "gemini-2.5-flash",
+    duration_ms: j.duration_ms ?? Date.now() - t0,
   };
 }
 

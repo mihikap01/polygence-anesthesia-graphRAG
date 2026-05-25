@@ -8,10 +8,8 @@ import {
 } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { cn } from "@/lib/cn";
-import { isBYOK, getStoredKey } from "@/lib/api-key";
-import {
-  explainInBrowser, chatInBrowser, MissingApiKeyError,
-} from "@/lib/llm/browser-pipeline";
+import { isBYOK } from "@/lib/api-key";
+import { explainInBrowser, chatInBrowser } from "@/lib/llm/browser-pipeline";
 import ApiKeyModal from "@/components/ApiKeyModal";
 
 // ---------- Shared: Context viewer ------------------------------------------
@@ -187,7 +185,7 @@ interface PanelProps {
   keyVersion: number;
 }
 
-function ExplainPanel({ byok, openKeyModal, keyVersion }: PanelProps) {
+function ExplainPanel({ byok, openKeyModal: _openKeyModal, keyVersion }: PanelProps) {
   const node = useStore((s) => s.selectedNode);
   const edge = useStore((s) => s.selectedEdge);
   const [explanation, setExplanation] = useState<string>("");
@@ -196,16 +194,14 @@ function ExplainPanel({ byok, openKeyModal, keyVersion }: PanelProps) {
   const [ai, setAi] = useState<any>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [needsKey, setNeedsKey] = useState(false);
 
   useEffect(() => {
     if (!node && !edge) {
       setExplanation(""); setEvidence(null); setContextSent(undefined);
-      setAi(null); setError(null); setNeedsKey(false); return;
+      setAi(null); setError(null); return;
     }
     setBusy(true);
     setError(null);
-    setNeedsKey(false);
     const args = node
       ? { kind: "node" as const, id: node.id }
       : { kind: "edge" as const, id: edge!.id };
@@ -229,14 +225,7 @@ function ExplainPanel({ byok, openKeyModal, keyVersion }: PanelProps) {
         setContextSent(j.contextSent);
         setAi(j.ai);
       })
-      .catch((e) => {
-        if (e instanceof MissingApiKeyError) {
-          setNeedsKey(true);
-          openKeyModal();
-        } else {
-          setError(String(e.message ?? e));
-        }
-      })
+      .catch((e) => setError(String(e.message ?? e)))
       .finally(() => setBusy(false));
   }, [node?.id, edge?.id, byok, keyVersion]);
 
@@ -290,15 +279,7 @@ function ExplainPanel({ byok, openKeyModal, keyVersion }: PanelProps) {
           </div>
         )}
         {error && <div className="text-red-400">{error}</div>}
-        {needsKey && !busy && (
-          <button
-            onClick={openKeyModal}
-            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-md bg-blue-600/20 border border-blue-500/40 text-blue-200 hover:bg-blue-600/30"
-          >
-            <KeyRound size={12}/> Add your LLM API key to Explain
-          </button>
-        )}
-        {!busy && !error && !needsKey && (
+        {!busy && !error && (
           <>
             {ai?.provider && ai.provider !== "none" && (
               <div className="text-[10px] text-slate-500 mb-2 font-mono">
@@ -442,7 +423,7 @@ function RetrievalStrip({ r, ai }: { r: ChatRetrieval; ai?: ChatMsg["ai"] }) {
   );
 }
 
-function ChatPanel({ byok, openKeyModal, keyVersion: _keyVersion }: PanelProps) {
+function ChatPanel({ byok, openKeyModal: _openKeyModal, keyVersion: _keyVersion }: PanelProps) {
   const node = useStore((s) => s.selectedNode);
   const graph = useStore((s) => s.graph);
   const [messages, setMessages] = useState<ChatMsg[]>([
@@ -458,11 +439,6 @@ function ChatPanel({ byok, openKeyModal, keyVersion: _keyVersion }: PanelProps) 
   async function send() {
     const q = input.trim();
     if (!q || busy) return;
-    // BYOK pre-check: open modal first if no key yet, don't burn a turn.
-    if (byok && !getStoredKey()) {
-      openKeyModal();
-      return;
-    }
     setInput("");
     setMessages((m) => [...m, { role: "user", content: q }]);
     setBusy(true);
@@ -488,12 +464,7 @@ function ChatPanel({ byok, openKeyModal, keyVersion: _keyVersion }: PanelProps) 
         ai: (j as any).ai,
       }]);
     } catch (e: any) {
-      if (e instanceof MissingApiKeyError) {
-        openKeyModal();
-        setMessages((m) => m.slice(0, -1)); // remove the user msg since we didn't process it
-      } else {
-        setMessages((m) => [...m, { role: "assistant", content: `Error: ${e?.message ?? e}` }]);
-      }
+      setMessages((m) => [...m, { role: "assistant", content: `Error: ${e?.message ?? e}` }]);
     } finally {
       setBusy(false);
     }

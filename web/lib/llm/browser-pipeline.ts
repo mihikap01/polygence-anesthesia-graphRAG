@@ -1,8 +1,12 @@
 "use client";
 
-// Browser-side equivalents of /api/explain and /api/chat. Built so the
-// response shape matches the server routes 1:1 — RightSidebar just calls
-// these instead of fetch() when NEXT_PUBLIC_BYOK=1.
+// Browser-side equivalents of /api/explain and /api/chat. The response shape
+// matches the server routes 1:1 so RightSidebar just calls these in the
+// NEXT_PUBLIC_BYOK build.
+//
+// Default path: proxyAsk() → /api/llm (Cloud Function with DeepSeek key).
+// Override: if the user pasted their own OpenAI/Anthropic/DeepSeek key in the
+// modal, we skip the proxy and call the provider directly from the browser.
 
 import {
   nodeContext,
@@ -11,7 +15,7 @@ import {
 } from "@/lib/graph/retrieve";
 import { ensureGraphLoaded } from "@/lib/graph/client-loader";
 import { getStoredKey } from "@/lib/api-key";
-import { browserAsk } from "@/lib/llm/browser";
+import { browserAsk, proxyAsk, type BrowserAskOutput } from "@/lib/llm/browser";
 import {
   EXPLAIN_SYSTEM,
   CHAT_SYSTEM,
@@ -19,19 +23,19 @@ import {
   buildChatUserPrompt,
 } from "@/lib/llm/prompts";
 
-export class MissingApiKeyError extends Error {
-  constructor() {
-    super("missing api key");
-    this.name = "MissingApiKeyError";
-  }
+async function ask(input: {
+  systemPrompt: string;
+  userPrompt: string;
+}): Promise<BrowserAskOutput> {
+  const stored = getStoredKey();
+  if (stored) return browserAsk(stored, input);
+  return proxyAsk(input);
 }
 
 export async function explainInBrowser(args: {
   kind: "node" | "edge";
   id: string;
 }) {
-  const stored = getStoredKey();
-  if (!stored) throw new MissingApiKeyError();
   const { full } = await ensureGraphLoaded();
 
   let ctx;
@@ -56,10 +60,7 @@ export async function explainInBrowser(args: {
     chars: userPrompt.length + EXPLAIN_SYSTEM.length,
   };
 
-  const out = await browserAsk(stored, {
-    systemPrompt: EXPLAIN_SYSTEM,
-    userPrompt,
-  });
+  const out = await ask({ systemPrompt: EXPLAIN_SYSTEM, userPrompt });
   return {
     explanation: out.text,
     evidence: { pmids: ctx.pmids },
@@ -77,8 +78,6 @@ export async function chatInBrowser(args: {
   focusNodeId?: string | null;
   visibleNodeIds?: string[];
 }) {
-  const stored = getStoredKey();
-  if (!stored) throw new MissingApiKeyError();
   const { full } = await ensureGraphLoaded();
 
   const retrieval = retrieveForQuestion(full, args.question, {
@@ -118,10 +117,7 @@ export async function chatInBrowser(args: {
     chars: userPrompt.length + CHAT_SYSTEM.length,
   };
 
-  const out = await browserAsk(stored, {
-    systemPrompt: CHAT_SYSTEM,
-    userPrompt,
-  });
+  const out = await ask({ systemPrompt: CHAT_SYSTEM, userPrompt });
   return {
     answer: out.text,
     retrieval: retrievalForClient,
