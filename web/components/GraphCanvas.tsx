@@ -239,21 +239,21 @@ function highlightNeighbours(cy: Core, nodeId: string) {
 
 function Legend() {
   const items: Array<[string, string, string]> = [
-    ["#3b82f6", "Drug", "rectangle"],
-    ["#a855f7", "Drug class", "hexagon"],
-    ["#ec4899", "Gene", "circle"],
-    ["#f97316", "Variants", "diamond"],
-    ["#eab308", "Phenotype", "tag"],
-    ["#ef4444", "Critical risk edge", "edge"],
+    ["#2563eb", "Drug", "rectangle"],
+    ["#7c3aed", "Drug class", "hexagon"],
+    ["#db2777", "Gene", "circle"],
+    ["#ea580c", "Variants", "diamond"],
+    ["#ca8a04", "Phenotype", "tag"],
+    ["#dc2626", "Critical risk edge", "edge"],
   ];
   return (
-    <div className="absolute left-4 bottom-4 card rounded-xl px-3 py-2 text-xs">
-      <div className="font-semibold mb-1.5 text-slate-300">Legend</div>
+    <div className="absolute left-4 bottom-4 card rounded-2xl px-4 py-3 text-xs shadow-soft">
+      <div className="font-semibold mb-2 text-foreground">Legend</div>
       <div className="grid grid-cols-2 gap-x-4 gap-y-1">
         {items.map(([color, label]) => (
           <div key={label} className="flex items-center gap-2">
             <span style={{ background: color }} className="w-2.5 h-2.5 rounded-full inline-block" />
-            <span className="text-slate-300">{label}</span>
+            <span className="text-muted-foreground">{label}</span>
           </div>
         ))}
       </div>

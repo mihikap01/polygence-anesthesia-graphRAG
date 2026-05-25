@@ -26,8 +26,8 @@ export default function Page() {
       <section className="flex-1 relative min-w-0">
         <GraphCanvas />
         {loading && (
-          <div className="absolute inset-0 flex items-center justify-center bg-slate-950/60 backdrop-blur-sm z-10">
-            <div className="flex items-center gap-2 text-sm text-slate-300">
+          <div className="absolute inset-0 flex items-center justify-center bg-background/70 backdrop-blur-sm z-10">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <span className="dots"><span/><span/><span/></span> Loading graph…
             </div>
           </div>

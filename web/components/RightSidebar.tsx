@@ -52,10 +52,10 @@ function ContextViewer({ context }: { context?: ContextSent }) {
   };
 
   return (
-    <div className="mt-3 rounded-md border border-slate-700/50 bg-slate-900/40 overflow-hidden">
+    <div className="mt-3 rounded-md border border-border bg-muted/30 overflow-hidden">
       <button
         onClick={() => setOpen((o) => !o)}
-        className="w-full px-2.5 py-1.5 flex items-center justify-between text-[10px] text-slate-400 hover:bg-slate-800/40"
+        className="w-full px-2.5 py-1.5 flex items-center justify-between text-[10px] text-muted-foreground hover:bg-accent"
       >
         <span className="flex items-center gap-1.5">
           {open ? <ChevronDown size={11}/> : <ChevronRight size={11}/>}
@@ -75,15 +75,15 @@ function ContextViewer({ context }: { context?: ContextSent }) {
         </span>
       </button>
       {open && (
-        <div className="border-t border-slate-700/50">
-          <div className="flex border-b border-slate-800/60 text-[10px]">
+        <div className="border-t border-border">
+          <div className="flex border-b border-border text-[10px]">
             {(["context", "system", "user"] as const).map((t) => (
               <button
                 key={t}
                 onClick={() => setTab(t)}
                 className={cn(
                   "px-2.5 py-1.5 font-medium uppercase tracking-wider transition-colors",
-                  tab === t ? "text-blue-300 bg-slate-800/60" : "text-slate-500 hover:text-slate-300"
+                  tab === t ? "text-primary bg-accent" : "text-muted-foreground hover:text-foreground/80"
                 )}
               >
                 {t === "context" ? "Graph context" : t === "system" ? "System prompt" : "User prompt"}
@@ -91,12 +91,12 @@ function ContextViewer({ context }: { context?: ContextSent }) {
             ))}
             <div className="ml-auto flex items-center pr-1">
               <button onClick={copy}
-                      className="px-2 py-1 text-[10px] text-slate-400 hover:text-white flex items-center gap-1">
+                      className="px-2 py-1 text-[10px] text-muted-foreground hover:text-foreground flex items-center gap-1">
                 {copied ? <><Check size={11}/> copied</> : <><Copy size={11}/> copy</>}
               </button>
             </div>
           </div>
-          <pre className="text-[10.5px] leading-relaxed text-slate-300 p-2.5 max-h-72 overflow-auto font-mono whitespace-pre-wrap break-words">
+          <pre className="text-[10.5px] leading-relaxed text-foreground/80 p-2.5 max-h-72 overflow-auto font-mono whitespace-pre-wrap break-words">
 {active}
           </pre>
         </div>
@@ -113,7 +113,7 @@ export default function RightSidebar() {
   const byok = isBYOK();
   return (
     <aside className="w-[400px] shrink-0 h-full flex flex-col card border-l border-y-0 border-r-0">
-      <div className="flex border-b border-slate-800/60">
+      <div className="flex border-b border-border">
         <TabBtn active={tab === "explain"} onClick={() => setTab("explain")}>
           <Sparkles size={13}/> Explain
         </TabBtn>
@@ -123,27 +123,27 @@ export default function RightSidebar() {
         {byok && (
           <button
             onClick={() => setKeyModalOpen(true)}
-            className="px-3 text-slate-400 hover:text-blue-300 border-l border-slate-800/60"
+            className="px-3 text-muted-foreground hover:text-primary border-l border-border"
             title="Manage your API key"
           >
             <KeyRound size={13}/>
           </button>
         )}
       </div>
-      <div className="px-3 py-2 border-b border-slate-800/60 bg-slate-900/30">
+      <div className="px-3 py-2 border-b border-border bg-muted/20">
         {tab === "explain" ? (
-          <div className="flex items-start gap-2 text-[10.5px] text-slate-400 leading-snug">
-            <MousePointerClick size={12} className="mt-0.5 shrink-0 text-blue-400/80"/>
+          <div className="flex items-start gap-2 text-[10.5px] text-muted-foreground leading-snug">
+            <MousePointerClick size={12} className="mt-0.5 shrink-0 text-primary/80"/>
             <span>
-              <span className="text-slate-200 font-medium">Click-driven.</span>{" "}
+              <span className="text-foreground font-medium">Click-driven.</span>{" "}
               Select any node or edge on the canvas — Claude explains it using its 2-hop graph neighbourhood.
             </span>
           </div>
         ) : (
-          <div className="flex items-start gap-2 text-[10.5px] text-slate-400 leading-snug">
-            <MessageSquare size={12} className="mt-0.5 shrink-0 text-blue-400/80"/>
+          <div className="flex items-start gap-2 text-[10.5px] text-muted-foreground leading-snug">
+            <MessageSquare size={12} className="mt-0.5 shrink-0 text-primary/80"/>
             <span>
-              <span className="text-slate-200 font-medium">Question-driven.</span>{" "}
+              <span className="text-foreground font-medium">Question-driven.</span>{" "}
               Type a question — GraphRAG entity-links it to the graph, retrieves paths, then Claude answers.
             </span>
           </div>
@@ -169,7 +169,7 @@ function TabBtn({ active, onClick, children }: { active: boolean; onClick: () =>
       onClick={onClick}
       className={cn(
         "flex-1 px-3 py-2.5 text-xs font-medium flex items-center justify-center gap-1.5 transition-colors",
-        active ? "text-white bg-slate-800/70 border-b-2 border-blue-500" : "text-slate-400 hover:text-slate-200"
+        active ? "text-foreground bg-accent border-b-2 border-primary" : "text-muted-foreground hover:text-foreground"
       )}
     >
       {children}
@@ -231,15 +231,15 @@ function ExplainPanel({ byok, openKeyModal: _openKeyModal, keyVersion }: PanelPr
 
   if (!node && !edge) {
     return (
-      <div className="h-full flex flex-col items-center justify-center text-center p-6 text-slate-400">
-        <MousePointerClick size={28} className="text-slate-600 mb-3"/>
-        <div className="text-xs font-medium text-slate-300 mb-1">Nothing selected yet</div>
-        <div className="text-[11px] text-slate-500 leading-snug max-w-[260px]">
-          Click any <span className="text-slate-300">node</span> or <span className="text-red-400">edge</span> on the
+      <div className="h-full flex flex-col items-center justify-center text-center p-6 text-muted-foreground">
+        <MousePointerClick size={28} className="text-muted-foreground/70 mb-3"/>
+        <div className="text-xs font-medium text-foreground/80 mb-1">Nothing selected yet</div>
+        <div className="text-[11px] text-muted-foreground leading-snug max-w-[260px]">
+          Click any <span className="text-foreground/80">node</span> or <span className="text-red-600">edge</span> on the
           graph to the left — Claude will explain it using its 2-hop graph neighbourhood.
         </div>
-        <div className="text-[10px] text-slate-600 mt-3">
-          For freeform questions, switch to the <span className="text-slate-400">Chat</span> tab.
+        <div className="text-[10px] text-muted-foreground/70 mt-3">
+          For freeform questions, switch to the <span className="text-muted-foreground">Chat</span> tab.
         </div>
       </div>
     );
@@ -250,17 +250,17 @@ function ExplainPanel({ byok, openKeyModal: _openKeyModal, keyVersion }: PanelPr
 
   return (
     <div className="h-full flex flex-col overflow-hidden">
-      <div className="p-3 border-b border-slate-800/60">
-        <div className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">{subtitle}</div>
-        <div className="text-sm font-semibold text-white mt-0.5 truncate" title={title}>{title}</div>
+      <div className="p-3 border-b border-border">
+        <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">{subtitle}</div>
+        <div className="text-sm font-semibold text-foreground mt-0.5 truncate" title={title}>{title}</div>
         {node?.fullName && node.fullName !== node.label && (
-          <div className="text-[11px] text-slate-400 mt-0.5">{node.fullName}</div>
+          <div className="text-[11px] text-muted-foreground mt-0.5">{node.fullName}</div>
         )}
         {(node?.pharmgkb_id || edge?.level) && (
           <div className="flex flex-wrap gap-1 mt-2">
             {node?.pharmgkb_id && (
               <a href={`https://www.pharmgkb.org/${node.type === "drug" ? "chemical" : node.type === "gene" ? "gene" : "disease"}/${node.pharmgkb_id}`}
-                 target="_blank" rel="noreferrer" className="chip hover:bg-slate-700/80">
+                 target="_blank" rel="noreferrer" className="chip hover:bg-accent">
                 PharmGKB <ExternalLink size={9} />
               </a>
             )}
@@ -274,35 +274,35 @@ function ExplainPanel({ byok, openKeyModal: _openKeyModal, keyVersion }: PanelPr
 
       <div className="p-3 overflow-y-auto flex-1 text-xs leading-relaxed">
         {busy && (
-          <div className="flex items-center gap-2 text-slate-400">
+          <div className="flex items-center gap-2 text-muted-foreground">
             <span className="dots"><span/><span/><span/></span> Reasoning over graph context…
           </div>
         )}
-        {error && <div className="text-red-400">{error}</div>}
+        {error && <div className="text-red-600">{error}</div>}
         {!busy && !error && (
           <>
             {ai?.provider && ai.provider !== "none" && (
-              <div className="text-[10px] text-slate-500 mb-2 font-mono">
+              <div className="text-[10px] text-muted-foreground mb-2 font-mono">
                 {ai.provider}
                 {ai.duration_ms ? ` · ${(ai.duration_ms / 1000).toFixed(1)}s` : ""}
                 {ai.cost_usd ? ` · $${ai.cost_usd.toFixed(3)}` : ""}
               </div>
             )}
-            <p className="whitespace-pre-wrap text-slate-200">{explanation}</p>
+            <p className="whitespace-pre-wrap text-foreground">{explanation}</p>
             {evidence?.pmids?.length > 0 && (
               <div className="mt-3">
-                <div className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold mb-1">PMIDs</div>
+                <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-1">PMIDs</div>
                 <div className="flex flex-wrap gap-1">
                   {evidence.pmids.slice(0, 12).map((pmid: string) => (
                     <a key={pmid} href={`https://pubmed.ncbi.nlm.nih.gov/${pmid}/`}
-                       target="_blank" rel="noreferrer" className="chip hover:bg-slate-700/80">{pmid}</a>
+                       target="_blank" rel="noreferrer" className="chip hover:bg-accent">{pmid}</a>
                   ))}
                 </div>
               </div>
             )}
             {node?.members && node.members.length > 0 && (
               <div className="mt-3">
-                <div className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold mb-1">
+                <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-1">
                   Variants ({node.members.length})
                 </div>
                 <div className="flex flex-wrap gap-1 max-h-40 overflow-y-auto">
@@ -310,7 +310,7 @@ function ExplainPanel({ byok, openKeyModal: _openKeyModal, keyVersion }: PanelPr
                     <a key={i}
                        href={m.rsid.startsWith("rs") ? `https://www.ncbi.nlm.nih.gov/snp/${m.rsid}` : "#"}
                        target="_blank" rel="noreferrer"
-                       className="chip font-mono text-[10px] hover:bg-slate-700/80">
+                       className="chip font-mono text-[10px] hover:bg-accent">
                       {m.rsid}{m.level ? ` · ${m.level}` : ""}
                     </a>
                   ))}
@@ -364,17 +364,17 @@ function RetrievalStrip({ r, ai }: { r: ChatRetrieval; ai?: ChatMsg["ai"] }) {
   const hasContent = r.entities.length > 0 || r.paths.length > 0;
   if (!hasContent) {
     return (
-      <div className="text-[10px] text-slate-500 mb-2 italic">
+      <div className="text-[10px] text-muted-foreground mb-2 italic">
         no graph entities matched — answering from visible context only
       </div>
     );
   }
   return (
-    <div className="mb-2 pb-2 border-b border-slate-700/40">
-      <div className="text-[9px] uppercase tracking-wider text-slate-500 font-semibold mb-1 flex items-center gap-2">
+    <div className="mb-2 pb-2 border-b border-border">
+      <div className="text-[9px] uppercase tracking-wider text-muted-foreground font-semibold mb-1 flex items-center gap-2">
         <span>GraphRAG retrieved</span>
         {ai?.provider && ai.provider !== "none" && ai.provider !== "error" && (
-          <span className="text-slate-600 normal-case tracking-normal font-normal">
+          <span className="text-muted-foreground/70 normal-case tracking-normal font-normal">
             · {ai.provider}
             {ai.duration_ms ? ` · ${(ai.duration_ms / 1000).toFixed(1)}s` : ""}
             {ai.cost_usd ? ` · $${ai.cost_usd.toFixed(3)}` : ""}
@@ -395,13 +395,13 @@ function RetrievalStrip({ r, ai }: { r: ChatRetrieval; ai?: ChatMsg["ai"] }) {
       )}
       {r.paths.length > 0 && (
         <div className="space-y-0.5">
-          <div className="text-[9px] uppercase tracking-wider text-slate-500 font-semibold mt-1.5">
+          <div className="text-[9px] uppercase tracking-wider text-muted-foreground font-semibold mt-1.5">
             paths ({r.paths.length})
           </div>
           {r.paths.slice(0, 4).map((p, i) => (
             <div key={i} className={cn(
               "text-[10px] leading-tight flex items-center gap-1 font-mono",
-              p.critical ? "text-red-300" : "text-slate-400"
+              p.critical ? "text-red-600" : "text-muted-foreground"
             )}>
               <span className="opacity-60">[{p.hops}h{p.critical ? "·!" : ""}]</span>
               <span className="truncate">
@@ -416,7 +416,7 @@ function RetrievalStrip({ r, ai }: { r: ChatRetrieval; ai?: ChatMsg["ai"] }) {
           ))}
         </div>
       )}
-      <div className="text-[9px] text-slate-600 mt-1.5">
+      <div className="text-[9px] text-muted-foreground/70 mt-1.5">
         subgraph: {r.subgraphSize.nodes} nodes · {r.subgraphSize.edges} edges
       </div>
     </div>
@@ -478,8 +478,8 @@ function ChatPanel({ byok, openKeyModal: _openKeyModal, keyVersion: _keyVersion 
             <div className={cn(
               "inline-block max-w-[92%] px-3 py-2 rounded-lg text-left",
               m.role === "user"
-                ? "bg-blue-600/30 border border-blue-500/30 text-blue-50"
-                : "bg-slate-800/70 border border-slate-700/60 text-slate-200"
+                ? "bg-primary text-primary-foreground shadow-soft"
+                : "bg-accent border border-border text-foreground"
             )}>
               {m.role === "assistant" && m.retrieval && (
                 <RetrievalStrip r={m.retrieval} ai={m.ai} />
@@ -490,7 +490,7 @@ function ChatPanel({ byok, openKeyModal: _openKeyModal, keyVersion: _keyVersion 
                   {m.citations.pmids.slice(0, 8).map((p: string) => (
                     <a key={p} href={`https://pubmed.ncbi.nlm.nih.gov/${p}/`}
                        target="_blank" rel="noreferrer"
-                       className="chip text-[10px] hover:bg-slate-700/80">{p}</a>
+                       className="chip text-[10px] hover:bg-accent">{p}</a>
                   ))}
                 </div>
               )}
@@ -501,20 +501,20 @@ function ChatPanel({ byok, openKeyModal: _openKeyModal, keyVersion: _keyVersion 
           </div>
         ))}
         {busy && (
-          <div className="text-xs text-slate-400 flex items-center gap-2">
+          <div className="text-xs text-muted-foreground flex items-center gap-2">
             <span className="dots"><span/><span/><span/></span> Searching graph…
           </div>
         )}
       </div>
-      <div className="p-2 border-t border-slate-800/60 flex gap-2">
+      <div className="p-2 border-t border-border flex gap-2">
         <input
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && send()}
           placeholder={node ? `Ask about ${node.label}…` : "Ask about the visible graph…"}
-          className="flex-1 px-3 py-2 text-xs rounded-md bg-slate-900/60 border border-slate-700/60 focus:border-blue-500/60 outline-none placeholder:text-slate-500"
+          className="flex-1 px-3 py-2 text-xs rounded-full bg-card border border-border focus:border-primary/60 outline-none placeholder:text-muted-foreground shadow-soft"
         />
-        <button className="btn-primary btn" onClick={send} disabled={busy}>
+        <button className="btn btn-primary" onClick={send} disabled={busy}>
           <Send size={12}/>
         </button>
       </div>

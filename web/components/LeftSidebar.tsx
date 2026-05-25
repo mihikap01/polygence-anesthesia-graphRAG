@@ -67,33 +67,33 @@ export default function LeftSidebar() {
 
   return (
     <aside className="w-72 shrink-0 h-full flex flex-col card border-r border-y-0 border-l-0">
-      <div className="p-3 border-b border-slate-800/60">
+      <div className="p-4 border-b border-border">
         <div className="flex items-center gap-2 mb-1">
-          <div className="w-2 h-2 rounded-full bg-blue-500" />
-          <h1 className="text-sm font-semibold tracking-tight">Polygence GraphRAG</h1>
+          <div className="w-2 h-2 rounded-full bg-primary" />
+          <h1 className="text-sm font-semibold tracking-tight text-foreground">Polygence GraphRAG</h1>
         </div>
-        <p className="text-[11px] text-slate-400 leading-snug">
+        <p className="text-[11px] text-muted-foreground leading-snug">
           Pharmacogenomic & anesthesia risk reasoning
         </p>
       </div>
 
-      <div className="p-3 border-b border-slate-800/60">
+      <div className="p-3 border-b border-border">
         <div className="relative">
-          <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500" />
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Search drugs, genes, phenotypes…"
-            className="w-full pl-8 pr-2 py-2 text-xs rounded-md bg-slate-900/60 border border-slate-700/60 focus:border-blue-500/60 outline-none placeholder:text-slate-500"
+            className="w-full pl-9 pr-3 py-2 text-xs rounded-full bg-card border border-border focus:border-primary/50 outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1 focus:ring-offset-background placeholder:text-muted-foreground/70 shadow-soft"
           />
         </div>
         {hits.length > 0 && (
-          <ul className="mt-2 max-h-56 overflow-auto rounded-md border border-slate-800/60 bg-slate-900/70 text-xs">
+          <ul className="mt-2 max-h-56 overflow-auto rounded-2xl border border-border bg-card text-xs shadow-soft">
             {hits.map((h) => (
               <li key={h.id}>
                 <button
                   onClick={() => { loadFor(h.id); setQ(""); setHits([]); }}
-                  className="w-full text-left px-2.5 py-1.5 hover:bg-slate-800/70 flex items-center justify-between gap-2"
+                  className="w-full text-left px-3 py-2 hover:bg-accent flex items-center justify-between gap-2 text-foreground"
                 >
                   <span className="truncate">{h.label}</span>
                   <span className="chip">{NODE_LABELS[h.type] ?? h.type}</span>
@@ -102,7 +102,7 @@ export default function LeftSidebar() {
             ))}
           </ul>
         )}
-        <button className="btn w-full mt-2 justify-center" onClick={loadSeed}>
+        <button className="btn btn-primary w-full mt-2 justify-center" onClick={loadSeed}>
           <RefreshCw size={12}/> Load anesthesia seed
         </button>
       </div>
@@ -127,7 +127,7 @@ export default function LeftSidebar() {
               checked={filters.edgeTypes[t]}
               onChange={() => toggleEdgeType(t)}
               label={EDGE_LABELS[t]}
-              dot={t === "linked_to_risk" || t === "can_trigger" ? "#ef4444" : "#64748b"}
+              dot={t === "linked_to_risk" || t === "can_trigger" ? "#dc2626" : "#94a3b8"}
             />
           ))}
         </Section>
@@ -139,10 +139,10 @@ export default function LeftSidebar() {
                 key={lv}
                 onClick={() => toggleEvidenceLevel(lv)}
                 className={
-                  "px-2 py-1 rounded-md text-[10px] font-medium border transition-colors " +
+                  "px-2.5 py-1 rounded-full text-[10px] font-medium border transition-colors " +
                   (filters.evidenceLevels[lv]
-                    ? "bg-blue-500/20 border-blue-500/40 text-blue-200"
-                    : "bg-slate-900/60 border-slate-700/50 text-slate-500")
+                    ? "bg-primary/15 border-primary/40 text-primary"
+                    : "bg-card border-border text-muted-foreground hover:bg-accent")
                 }
               >{lv}</button>
             ))}
@@ -155,13 +155,13 @@ export default function LeftSidebar() {
             onChange={() => setFilters({ collapseVariants: !filters.collapseVariants })}
             label="Collapse variants"
           />
-          <label className="text-[11px] text-slate-400 block mt-2">
-            Max nodes: <span className="text-slate-200">{filters.maxNodes}</span>
+          <label className="text-[11px] text-muted-foreground block mt-2">
+            Max nodes: <span className="text-foreground">{filters.maxNodes}</span>
             <input
               type="range" min={20} max={300} step={10}
               value={filters.maxNodes}
               onChange={(e) => setFilters({ maxNodes: Number(e.target.value) })}
-              className="w-full mt-1 accent-blue-500"
+              className="w-full mt-1 accent-primary"
             />
           </label>
         </Section>
@@ -177,7 +177,7 @@ export default function LeftSidebar() {
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div>
-      <div className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold mb-1.5">{title}</div>
+      <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-1.5">{title}</div>
       <div className="space-y-1">{children}</div>
     </div>
   );
@@ -187,12 +187,12 @@ function Toggle({
   checked, onChange, label, dot,
 }: { checked: boolean; onChange: () => void; label: string; dot?: string }) {
   return (
-    <label className="flex items-center gap-2 text-xs cursor-pointer text-slate-300 hover:text-white">
+    <label className="flex items-center gap-2 text-xs cursor-pointer text-foreground/80 hover:text-foreground">
       <input
         type="checkbox"
         checked={checked}
         onChange={onChange}
-        className="accent-blue-500 h-3 w-3 rounded"
+        className="accent-primary h-3.5 w-3.5 rounded"
       />
       {dot && <span style={{ background: dot }} className="w-2 h-2 rounded-full" />}
       <span>{label}</span>
@@ -202,7 +202,7 @@ function Toggle({
 
 function dotColorFor(t: NodeType) {
   return {
-    drug: "#3b82f6", gene: "#ec4899", variant_cluster: "#f97316",
-    drug_class: "#a855f7", phenotype: "#eab308",
+    drug: "#2563eb", gene: "#db2777", variant_cluster: "#ea580c",
+    drug_class: "#7c3aed", phenotype: "#ca8a04",
   }[t];
 }
