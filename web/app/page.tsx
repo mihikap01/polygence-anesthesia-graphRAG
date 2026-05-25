@@ -21,7 +21,7 @@ export default function Page() {
   }, [setGraph, setLoading]);
 
   return (
-    <main className="flex h-screen w-screen overflow-hidden">
+    <main className="flex h-screen w-screen overflow-hidden fixed inset-0">
       <LeftSidebar />
       <section className="flex-1 relative min-w-0">
         <GraphCanvas />

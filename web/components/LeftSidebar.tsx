@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Fuse from "fuse.js";
-import { Search, RefreshCw, Filter as FilterIcon } from "lucide-react";
+import Link from "next/link";
+import { Search, RefreshCw, Filter as FilterIcon, Info } from "lucide-react";
 import { useStore } from "@/lib/store";
 import type { SearchHit, NodeType, EdgeType } from "@/lib/graph/types";
 import { fetchSearchIndex, fetchGraphForSeed, fetchSeedGraph } from "@/lib/graph/data-api";
@@ -75,6 +76,13 @@ export default function LeftSidebar() {
         <p className="text-[11px] text-muted-foreground leading-snug">
           Pharmacogenomic & anesthesia risk reasoning
         </p>
+        <Link
+          href="/about"
+          className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary/15 transition-colors"
+          title="About this project"
+        >
+          <Info size={12}/> About this project
+        </Link>
       </div>
 
       <div className="p-3 border-b border-border">

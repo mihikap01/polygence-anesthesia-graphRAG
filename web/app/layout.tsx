@@ -32,7 +32,7 @@ export default function RootLayout({
           rel="stylesheet"
         />
       </head>
-      <body className="h-screen overflow-hidden bg-background text-foreground antialiased">
+      <body className="bg-background text-foreground antialiased">
         {children}
       </body>
     </html>
