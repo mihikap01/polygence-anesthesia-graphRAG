@@ -6,7 +6,8 @@
 
 import Fuse from "fuse.js";
 import type { Graph, GraphEdge, GraphNode, SearchHit } from "./types";
-import { neighbourhood, getSearchIndex } from "./loader";
+import { neighbourhood } from "./ops";
+import { getSearchIndex } from "./runtime";
 
 const EDGE_VERB: Record<string, string> = {
   linked_to_risk: "is linked to risk of",

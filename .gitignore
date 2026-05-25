@@ -23,5 +23,9 @@ data/
 # Claude harness state
 .claude/
 
+# Firebase
+.firebase/
+firebase-debug.log
+
 # Unrelated project
 silent-spaces/

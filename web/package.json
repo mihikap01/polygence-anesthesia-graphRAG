@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "build:firebase": "node scripts/build-firebase.mjs",
+    "deploy:firebase": "npm run build:firebase && (cd .. && firebase deploy --only hosting)"
   },
   "dependencies": {
     "next": "14.2.5",

@@ -5,6 +5,7 @@ import Fuse from "fuse.js";
 import { Search, RefreshCw, Filter as FilterIcon } from "lucide-react";
 import { useStore } from "@/lib/store";
 import type { SearchHit, NodeType, EdgeType } from "@/lib/graph/types";
+import { fetchSearchIndex, fetchGraphForSeed, fetchSeedGraph } from "@/lib/graph/data-api";
 
 const NODE_LABELS: Record<NodeType, string> = {
   drug: "Drugs",
@@ -38,7 +39,7 @@ export default function LeftSidebar() {
   const [allHits, setAllHits] = useState<SearchHit[]>([]);
 
   useEffect(() => {
-    fetch("/api/search").then((r) => r.json()).then(setAllHits);
+    fetchSearchIndex().then(setAllHits);
   }, []);
 
   const fuse = useMemo(
@@ -53,16 +54,14 @@ export default function LeftSidebar() {
 
   async function loadFor(id: string) {
     setLoading(true);
-    const r = await fetch(`/api/graph?seed=${encodeURIComponent(id)}&hops=2`);
-    const g = await r.json();
+    const g = await fetchGraphForSeed(id, 2);
     setGraph(g);
     setLoading(false);
   }
 
   async function loadSeed() {
     setLoading(true);
-    const r = await fetch("/api/graph?view=seed");
-    setGraph(await r.json());
+    setGraph(await fetchSeedGraph());
     setLoading(false);
   }
 

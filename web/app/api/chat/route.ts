@@ -12,7 +12,7 @@
 // Provider chosen by env LLM_PROVIDER (claude-cli | openai | none).
 
 import { NextResponse } from "next/server";
-import { getFullGraph } from "@/lib/graph/loader";
+import { getFullGraph, getSearchIndex } from "@/lib/graph/loader";
 import { retrieveForQuestion } from "@/lib/graph/retrieve";
 import { ask } from "@/lib/llm";
 import { CHAT_SYSTEM, buildChatUserPrompt } from "@/lib/llm/prompts";
@@ -29,6 +29,7 @@ export async function POST(req: Request) {
   }
 
   const full = getFullGraph();
+  getSearchIndex(); // ensure runtime cache is primed before retrieval runs Fuse
   const retrieval = retrieveForQuestion(full, question, { focusNodeId, visibleNodeIds });
 
   // Slim payload returned to the UI — keep nodes/edges compact for transit.

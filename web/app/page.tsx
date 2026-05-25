@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 import LeftSidebar from "@/components/LeftSidebar";
 import RightSidebar from "@/components/RightSidebar";
 import { useStore } from "@/lib/store";
+import { fetchSeedGraph } from "@/lib/graph/data-api";
 
 // Cytoscape touches `window` on construction, so load only on the client.
 const GraphCanvas = dynamic(() => import("@/components/GraphCanvas"), { ssr: false });
@@ -16,9 +17,7 @@ export default function Page() {
 
   useEffect(() => {
     setLoading(true);
-    fetch("/api/graph?view=seed")
-      .then((r) => r.json())
-      .then((g) => { setGraph(g); setLoading(false); });
+    fetchSeedGraph().then((g) => { setGraph(g); setLoading(false); });
   }, [setGraph, setLoading]);
 
   return (

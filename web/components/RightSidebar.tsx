@@ -4,9 +4,15 @@ import { useEffect, useState } from "react";
 import {
   MessageSquare, Sparkles, Info, ExternalLink, Send,
   ChevronDown, ChevronRight, Copy, Check, FileText, MousePointerClick,
+  KeyRound,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { cn } from "@/lib/cn";
+import { isBYOK, getStoredKey } from "@/lib/api-key";
+import {
+  explainInBrowser, chatInBrowser, MissingApiKeyError,
+} from "@/lib/llm/browser-pipeline";
+import ApiKeyModal from "@/components/ApiKeyModal";
 
 // ---------- Shared: Context viewer ------------------------------------------
 
@@ -104,6 +110,9 @@ function ContextViewer({ context }: { context?: ContextSent }) {
 export default function RightSidebar() {
   const tab = useStore((s) => s.rightTab);
   const setTab = useStore((s) => s.setRightTab);
+  const [keyModalOpen, setKeyModalOpen] = useState(false);
+  const [keyVersion, setKeyVersion] = useState(0); // bumps after Save to invalidate caches
+  const byok = isBYOK();
   return (
     <aside className="w-[400px] shrink-0 h-full flex flex-col card border-l border-y-0 border-r-0">
       <div className="flex border-b border-slate-800/60">
@@ -113,6 +122,15 @@ export default function RightSidebar() {
         <TabBtn active={tab === "chat"} onClick={() => setTab("chat")}>
           <MessageSquare size={13}/> Chat
         </TabBtn>
+        {byok && (
+          <button
+            onClick={() => setKeyModalOpen(true)}
+            className="px-3 text-slate-400 hover:text-blue-300 border-l border-slate-800/60"
+            title="Manage your API key"
+          >
+            <KeyRound size={13}/>
+          </button>
+        )}
       </div>
       <div className="px-3 py-2 border-b border-slate-800/60 bg-slate-900/30">
         {tab === "explain" ? (
@@ -134,8 +152,15 @@ export default function RightSidebar() {
         )}
       </div>
       <div className="flex-1 overflow-hidden">
-        {tab === "explain" ? <ExplainPanel /> : <ChatPanel />}
+        {tab === "explain"
+          ? <ExplainPanel byok={byok} openKeyModal={() => setKeyModalOpen(true)} keyVersion={keyVersion}/>
+          : <ChatPanel byok={byok} openKeyModal={() => setKeyModalOpen(true)} keyVersion={keyVersion}/>}
       </div>
+      <ApiKeyModal
+        open={keyModalOpen}
+        onClose={() => setKeyModalOpen(false)}
+        onSaved={() => setKeyVersion((v) => v + 1)}
+      />
     </aside>
   );
 }
@@ -156,7 +181,13 @@ function TabBtn({ active, onClick, children }: { active: boolean; onClick: () =>
 
 // ---------- Explain ---------------------------------------------------------
 
-function ExplainPanel() {
+interface PanelProps {
+  byok: boolean;
+  openKeyModal: () => void;
+  keyVersion: number;
+}
+
+function ExplainPanel({ byok, openKeyModal, keyVersion }: PanelProps) {
   const node = useStore((s) => s.selectedNode);
   const edge = useStore((s) => s.selectedEdge);
   const [explanation, setExplanation] = useState<string>("");
@@ -165,33 +196,49 @@ function ExplainPanel() {
   const [ai, setAi] = useState<any>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [needsKey, setNeedsKey] = useState(false);
 
   useEffect(() => {
     if (!node && !edge) {
       setExplanation(""); setEvidence(null); setContextSent(undefined);
-      setAi(null); setError(null); return;
+      setAi(null); setError(null); setNeedsKey(false); return;
     }
     setBusy(true);
     setError(null);
-    const body = node
+    setNeedsKey(false);
+    const args = node
       ? { kind: "node" as const, id: node.id }
       : { kind: "edge" as const, id: edge!.id };
-    fetch("/api/explain", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    })
-      .then(async (r) => {
-        const j = await r.json();
-        if (!r.ok) throw new Error(j.error || "Failed");
+
+    const work = byok
+      ? explainInBrowser(args)
+      : fetch("/api/explain", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(args),
+        }).then(async (r) => {
+          const j = await r.json();
+          if (!r.ok) throw new Error(j.error || "Failed");
+          return j;
+        });
+
+    work
+      .then((j: any) => {
         setExplanation(j.explanation || "");
         setEvidence(j.evidence || null);
         setContextSent(j.contextSent);
         setAi(j.ai);
       })
-      .catch((e) => setError(String(e.message ?? e)))
+      .catch((e) => {
+        if (e instanceof MissingApiKeyError) {
+          setNeedsKey(true);
+          openKeyModal();
+        } else {
+          setError(String(e.message ?? e));
+        }
+      })
       .finally(() => setBusy(false));
-  }, [node?.id, edge?.id]);
+  }, [node?.id, edge?.id, byok, keyVersion]);
 
   if (!node && !edge) {
     return (
@@ -243,7 +290,15 @@ function ExplainPanel() {
           </div>
         )}
         {error && <div className="text-red-400">{error}</div>}
-        {!busy && !error && (
+        {needsKey && !busy && (
+          <button
+            onClick={openKeyModal}
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-md bg-blue-600/20 border border-blue-500/40 text-blue-200 hover:bg-blue-600/30"
+          >
+            <KeyRound size={12}/> Add your LLM API key to Explain
+          </button>
+        )}
+        {!busy && !error && !needsKey && (
           <>
             {ai?.provider && ai.provider !== "none" && (
               <div className="text-[10px] text-slate-500 mb-2 font-mono">
@@ -387,7 +442,7 @@ function RetrievalStrip({ r, ai }: { r: ChatRetrieval; ai?: ChatMsg["ai"] }) {
   );
 }
 
-function ChatPanel() {
+function ChatPanel({ byok, openKeyModal, keyVersion: _keyVersion }: PanelProps) {
   const node = useStore((s) => s.selectedNode);
   const graph = useStore((s) => s.graph);
   const [messages, setMessages] = useState<ChatMsg[]>([
@@ -403,30 +458,42 @@ function ChatPanel() {
   async function send() {
     const q = input.trim();
     if (!q || busy) return;
+    // BYOK pre-check: open modal first if no key yet, don't burn a turn.
+    if (byok && !getStoredKey()) {
+      openKeyModal();
+      return;
+    }
     setInput("");
     setMessages((m) => [...m, { role: "user", content: q }]);
     setBusy(true);
     try {
-      const r = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          question: q,
-          focusNodeId: node?.id ?? null,
-          visibleNodeIds: graph.nodes.map((n) => n.id),
-        }),
-      });
-      const j = await r.json();
+      const args = {
+        question: q,
+        focusNodeId: node?.id ?? null,
+        visibleNodeIds: graph.nodes.map((n) => n.id),
+      };
+      const j = byok
+        ? await chatInBrowser(args)
+        : await fetch("/api/chat", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(args),
+          }).then((r) => r.json());
       setMessages((m) => [...m, {
         role: "assistant",
-        content: j.answer || j.error || "(no answer)",
-        citations: j.citations,
-        retrieval: j.retrieval,
-        contextSent: j.contextSent,
-        ai: j.ai,
+        content: (j as any).answer || (j as any).error || "(no answer)",
+        citations: (j as any).citations,
+        retrieval: (j as any).retrieval,
+        contextSent: (j as any).contextSent,
+        ai: (j as any).ai,
       }]);
     } catch (e: any) {
-      setMessages((m) => [...m, { role: "assistant", content: `Error: ${e?.message ?? e}` }]);
+      if (e instanceof MissingApiKeyError) {
+        openKeyModal();
+        setMessages((m) => m.slice(0, -1)); // remove the user msg since we didn't process it
+      } else {
+        setMessages((m) => [...m, { role: "assistant", content: `Error: ${e?.message ?? e}` }]);
+      }
     } finally {
       setBusy(false);
     }
