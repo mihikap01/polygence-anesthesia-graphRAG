@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>How we'll evaluate GraphRAG</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: hsl(40 30% 98%);
+    --fg: hsl(215 20% 18%);
+    --muted: hsl(210 20% 95%);
+    --muted-fg: hsl(215 15% 45%);
+    --card: #ffffff;
+    --primary: hsl(195 35% 42%);
+    --primary-fg: #fff;
+    --primary-bg: hsl(195 50% 95%);
+    --accent-bg: hsl(200 40% 94%);
+    --border: hsl(215 15% 88%);
+    --soft-shadow: 0 2px 12px -2px rgba(30, 50, 80, 0.08), 0 1px 3px -1px rgba(30, 50, 80, 0.04);
+    --gentle-shadow: 0 4px 20px -4px rgba(30, 50, 80, 0.10), 0 2px 6px -2px rgba(30, 50, 80, 0.05);
+    --good: hsl(150 35% 45%);
+    --good-bg: hsl(150 40% 94%);
+    --warn: hsl(40 70% 50%);
+    --warn-bg: hsl(40 70% 94%);
+    --bad: hsl(10 55% 50%);
+    --bad-bg: hsl(10 60% 95%);
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    font-size: 16px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 880px; margin: 0 auto; padding: 0 24px; }
+  .hero {
+    position: relative;
+    padding: 80px 24px 56px;
+    text-align: center;
+    background-image:
+      radial-gradient(60% 50% at 50% 0%, hsl(195 50% 92%) 0%, transparent 60%),
+      radial-gradient(40% 40% at 90% 100%, hsl(150 40% 92%) 0%, transparent 60%),
+      radial-gradient(40% 40% at 0% 100%, hsl(40 60% 94%) 0%, transparent 60%);
+  }
+  .pill {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 6px 14px; border-radius: 999px;
+    border: 1px solid var(--border); background: rgba(255,255,255,0.7);
+    box-shadow: var(--soft-shadow); backdrop-filter: blur(4px);
+    font-size: 12px; font-weight: 500; color: var(--muted-fg);
+  }
+  .pill .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--primary); }
+  h1 {
+    margin: 22px 0 16px;
+    font-size: 44px; line-height: 1.1;
+    font-weight: 600; letter-spacing: -0.02em;
+  }
+  h1 em { font-style: normal; color: var(--primary); }
+  .lede { max-width: 560px; margin: 0 auto; font-size: 17px; color: var(--muted-fg); }
+
+  section { padding: 48px 0; border-top: 1px solid var(--border); }
+  section:first-of-type { border-top: none; }
+  h2 {
+    font-size: 24px; line-height: 1.25; font-weight: 600;
+    letter-spacing: -0.01em; margin: 0 0 12px;
+  }
+  .sec-tag {
+    display: inline-block;
+    font-size: 11px; font-weight: 600; letter-spacing: 0.08em;
+    text-transform: uppercase; color: var(--primary);
+    padding: 4px 10px; border-radius: 999px;
+    background: var(--primary-bg);
+    margin-bottom: 10px;
+  }
+  p { margin: 12px 0; }
+  .muted { color: var(--muted-fg); }
+  strong { color: var(--fg); font-weight: 600; }
+
+  /* Cards & callouts */
+  .card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 20px; padding: 22px;
+    box-shadow: var(--soft-shadow);
+    margin: 18px 0;
+  }
+  .callout {
+    border-left: 4px solid var(--primary);
+    background: var(--primary-bg);
+    padding: 14px 18px; border-radius: 0 12px 12px 0;
+    font-size: 14px; color: var(--fg);
+    margin: 16px 0;
+  }
+  .callout-label {
+    display: block; font-size: 11px; font-weight: 700;
+    letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--primary); margin-bottom: 4px;
+  }
+
+  /* Arms diagram */
+  .arms {
+    display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;
+    margin: 20px 0;
+  }
+  .arm {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 16px; padding: 16px;
+    box-shadow: var(--soft-shadow);
+  }
+  .arm .lbl {
+    display: inline-flex; align-items: center;
+    font-size: 11px; font-weight: 700; letter-spacing: 0.08em;
+    padding: 3px 8px; border-radius: 6px;
+    background: var(--muted); color: var(--muted-fg);
+    margin-bottom: 8px;
+  }
+  .arm.a3 .lbl { background: var(--primary); color: var(--primary-fg); }
+  .arm h3 { margin: 4px 0 6px; font-size: 15px; font-weight: 600; }
+  .arm p { margin: 0; font-size: 13px; color: var(--muted-fg); }
+
+  /* Strata table */
+  table {
+    width: 100%; border-collapse: collapse; margin: 16px 0;
+    background: var(--card); border-radius: 14px; overflow: hidden;
+    box-shadow: var(--soft-shadow);
+    font-size: 14px;
+  }
+  th, td { padding: 10px 14px; text-align: left; border-bottom: 1px solid var(--border); }
+  th { background: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted-fg); }
+  tr:last-child td { border-bottom: none; }
+  td.right, th.right { text-align: right; }
+  tr.highlight td { background: var(--primary-bg); font-weight: 500; }
+
+  /* Pipeline flow */
+  .flow {
+    display: flex; flex-direction: column; gap: 8px; margin: 18px 0;
+  }
+  .step {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 14px; padding: 14px 18px;
+    box-shadow: var(--soft-shadow);
+    display: flex; gap: 14px; align-items: flex-start;
+  }
+  .step .num {
+    flex-shrink: 0; width: 28px; height: 28px;
+    border-radius: 50%; background: var(--primary); color: var(--primary-fg);
+    font-size: 12px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .step .body { flex: 1; }
+  .step .body strong { display: block; font-size: 14px; margin-bottom: 2px; }
+  .step .body span { color: var(--muted-fg); font-size: 13px; }
+  .arrow { text-align: center; color: var(--muted-fg); font-size: 18px; line-height: 1; padding: 2px 0; }
+
+  /* Hypothesis cards */
+  .hyp {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 16px; padding: 18px;
+    box-shadow: var(--soft-shadow); margin: 12px 0;
+  }
+  .hyp .name {
+    font-size: 11px; font-weight: 700; letter-spacing: 0.08em;
+    color: var(--primary); text-transform: uppercase;
+  }
+  .hyp .claim { font-size: 16px; font-weight: 600; margin: 4px 0 8px; }
+  .hyp .test { font-size: 13px; color: var(--muted-fg); }
+
+  /* Threats list */
+  .threat {
+    display: grid; grid-template-columns: 110px 1fr; gap: 14px;
+    padding: 12px 0; border-bottom: 1px dashed var(--border);
+    font-size: 14px;
+  }
+  .threat:last-child { border-bottom: none; }
+  .threat .sev {
+    font-size: 11px; font-weight: 700; letter-spacing: 0.05em;
+    text-transform: uppercase; padding: 3px 8px; border-radius: 6px;
+    height: 22px; align-self: flex-start;
+  }
+  .sev.high { background: var(--bad-bg); color: var(--bad); }
+  .sev.med { background: var(--warn-bg); color: var(--warn); }
+  .sev.low { background: var(--good-bg); color: var(--good); }
+
+  /* Verdict */
+  .verdict {
+    background: linear-gradient(135deg, hsl(195 50% 94%), hsl(150 40% 95%));
+    border: 1px solid var(--border); border-radius: 24px;
+    padding: 32px; margin: 24px 0;
+    box-shadow: var(--gentle-shadow);
+    text-align: center;
+  }
+  .verdict h3 { margin: 0 0 8px; font-size: 22px; }
+  .verdict p { color: var(--muted-fg); font-size: 15px; }
+
+  footer { text-align: center; padding: 40px 24px; color: var(--muted-fg); font-size: 12px; border-top: 1px solid var(--border); }
+
+  @media (max-width: 640px) {
+    h1 { font-size: 32px; }
+    .arms { grid-template-columns: 1fr; }
+    .threat { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <span class="pill"><span class="dot"></span> Eval design · v2 · post stress-test</span>
+  <h1>How we'll prove <em>GraphRAG actually helps</em>.</h1>
+  <p class="lede">
+    An honest, falsifiable test of whether the graph layer adds value beyond
+    "just giving the LLM some context." Designed so a clean win means
+    something — and a tie or loss is publishable, too.
+  </p>
+</div>
+
+<div class="wrap">
+
+<!-- 1. What we're trying to prove -->
+<section>
+  <span class="sec-tag">1 · The claim</span>
+  <h2>What are we trying to prove?</h2>
+  <p>
+    The GraphRAG system makes a specific claim: that combining a curated
+    PharmGKB knowledge graph with retrieval-augmented reasoning produces
+    answers that are <strong>more faithful, more specific, and less
+    hallucinated</strong> than a frontier LLM produces alone — and that
+    the benefit comes from <strong>graph structure</strong>, not just
+    "having any context at all."
+  </p>
+  <div class="callout">
+    <span class="callout-label">Why this is hard</span>
+    A frontier model has likely seen PharmGKB during training, so "no
+    context" isn't a blank slate. Naïve text-search RAG would give it
+    relevant snippets without any graph. And if the test questions come
+    from the same data the graph is built on, GraphRAG wins trivially.
+    The whole design is about ruling out those cheap explanations.
+  </div>
+</section>
+
+<!-- 2. The 4 arms -->
+<section>
+  <span class="sec-tag">2 · The setup</span>
+  <h2>Four versions of the same model, only the context differs</h2>
+  <p>
+    We ask the <em>same</em> frontier model (Claude Opus 4.7) the
+    <em>same</em> question, four different times — varying only what it
+    sees alongside the question. Then we compare which version answered
+    best.
+  </p>
+
+  <div class="arms">
+    <div class="arm">
+      <span class="lbl">A0 · No context</span>
+      <h3>Question only</h3>
+      <p>The LLM with nothing else. Tests: how much does it already know from training?</p>
+    </div>
+    <div class="arm">
+      <span class="lbl">A1 · Naïve RAG (steelman)</span>
+      <h3>Strong text-search retrieval</h3>
+      <p>Hybrid BM25 + dense embeddings, reranker, query rewriting. Tests: did <em>retrieval</em> help, irrespective of structure?</p>
+    </div>
+    <div class="arm">
+      <span class="lbl">A2 · Full context</span>
+      <h3>Whole subgraph as text</h3>
+      <p>Dumps the relevant region of the graph as plain text. Tests: did smart retrieval matter, or is a big context window enough?</p>
+    </div>
+    <div class="arm a3">
+      <span class="lbl">A3 · GraphRAG</span>
+      <h3>The system under test</h3>
+      <p>Entity linking → 1-hop neighborhoods → shortest paths → structured prompt. This is what we built.</p>
+    </div>
+  </div>
+
+  <div class="callout">
+    <span class="callout-label">Why A1 is the most important comparison</span>
+    Beating A0 is easy — of course context helps. Beating A1 means the
+    <strong>graph structure</strong> did something that plain text
+    retrieval couldn't. If A3 ties A1, GraphRAG didn't earn its complexity.
+    That would be a real finding, not a failure.
+  </div>
+</section>
+
+<!-- 3. Where questions come from -->
+<section>
+  <span class="sec-tag">3 · The questions</span>
+  <h2>Where do the 200 test questions come from?</h2>
+
+  <div class="flow">
+    <div class="step"><div class="num">1</div><div class="body">
+      <strong>Start with PharmGKB's high-quality rows</strong>
+      <span>From <code>clinicalVariants.tsv</code>, take the ~400 rows with strong evidence (levels 1A/1B/2A/2B).</span>
+    </div></div>
+    <div class="arrow">↓</div>
+    <div class="step"><div class="num">2</div><div class="body">
+      <strong>Hide 30% of those rows</strong>
+      <span>Randomly hold out ~120 rows. <strong>Rebuild the graph without them</strong>. The naïve-RAG arm also has them removed from its index. Now nobody has memorized them.</span>
+    </div></div>
+    <div class="arrow">↓</div>
+    <div class="step"><div class="num">3</div><div class="body">
+      <strong>Auto-generate questions from the hidden rows</strong>
+      <span>200 questions across 8 question-types (strata), each with a "gold" answer recorded — expected gene/drug, evidence level, valid PMIDs, and a "should-refuse" flag.</span>
+    </div></div>
+    <div class="arrow">↓</div>
+    <div class="step"><div class="num">4</div><div class="body">
+      <strong>Human spot-check the first 30</strong>
+      <span>Toss any questions that are unclear or have no clean gold answer.</span>
+    </div></div>
+  </div>
+
+  <div class="callout">
+    <span class="callout-label">The trick</span>
+    The <em>facts</em> are real PharmGKB knowledge, but the <em>exact rows</em>
+    are unseen by every arm. GraphRAG can still answer correctly — but only
+    by reasoning over neighboring rows, not by memorization. Same for the
+    naïve-RAG arm. That makes the comparison fair.
+  </div>
+</section>
+
+<!-- 4. Strata -->
+<section>
+  <span class="sec-tag">4 · The question types</span>
+  <h2>Eight strata, each testing a different claim</h2>
+  <p>
+    The 200 questions are split across 8 types ("strata"). Each tests a
+    specific thing GraphRAG should be good at — or shouldn't degrade on.
+  </p>
+
+  <table>
+    <thead>
+      <tr><th>#</th><th>Stratum</th><th>What it tests</th><th class="right">n</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>S1</td><td>Well-known facts</td><td>Does GraphRAG hurt easy questions?</td><td class="right">20</td></tr>
+      <tr><td>S2</td><td>Specific evidence levels</td><td>Precision (1A vs 2A matters clinically)</td><td class="right">25</td></tr>
+      <tr class="highlight"><td>S3</td><td><strong>Multi-hop reasoning</strong></td><td><strong>The key test of graph structure</strong></td><td class="right">40</td></tr>
+      <tr><td>S4</td><td>Citation grounding</td><td>PMID accuracy</td><td class="right">25</td></tr>
+      <tr><td>S5</td><td>Long-tail / niche</td><td>Retrieval value beyond what the LLM memorized</td><td class="right">25</td></tr>
+      <tr><td>S6</td><td>Negative controls</td><td>Does it hallucinate associations that don't exist?</td><td class="right">25</td></tr>
+      <tr><td>S7</td><td>Out-of-distribution</td><td>Does it refuse to answer about drugs not in the graph?</td><td class="right">15</td></tr>
+      <tr><td>S8</td><td>Comparative</td><td>Reasoning across multiple nodes</td><td class="right">25</td></tr>
+      <tr><td></td><td><strong>Total</strong></td><td></td><td class="right"><strong>200</strong></td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- 5. Grading -->
+<section>
+  <span class="sec-tag">5 · The grading</span>
+  <h2>Two passes: deterministic + Claude-Haiku judge</h2>
+  <p>
+    Each of the 800 answers (200 questions × 4 arms) gets scored two
+    different ways. Arm labels are stripped before grading — graders don't
+    know which version produced which answer.
+  </p>
+
+  <div class="card">
+    <strong>Pass 1 — Rule-based metrics (Python, deterministic)</strong>
+    <p class="muted" style="margin: 8px 0 0;">
+      Checks verifiable facts. Same definition across all 4 arms — no arm
+      gets free points or is penalized by construction.
+    </p>
+    <ul style="margin: 10px 0 0; padding-left: 20px; color: var(--muted-fg); font-size: 14px;">
+      <li><strong>PMID exists</strong> — does each cited paper ID actually exist in PubMed?</li>
+      <li><strong>PMID correctly attributed</strong> — does the cited paper actually support that specific claim?</li>
+      <li><strong>Entity precision / recall</strong> — did it name the right genes, drugs, phenotypes?</li>
+      <li><strong>Evidence-level exact match</strong> — does claimed "1A" match gold "1A"?</li>
+      <li><strong>Refusal correctness</strong> — did it refuse when the gold says "no association"?</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <strong>Pass 2 — Claude Haiku 4.5 as judge (semantic, anchored rubric)</strong>
+    <p class="muted" style="margin: 8px 0 0;">
+      The generation model is Claude Opus 4.7; the judge is Claude
+      Haiku 4.5. Different model sizes → different parameters → reduced
+      (not eliminated) self-preference bias. Also human-spot-checked.
+    </p>
+    <ul style="margin: 10px 0 0; padding-left: 20px; color: var(--muted-fg); font-size: 14px;">
+      <li><strong>Faithfulness 1–5</strong> — are claims supported by ground truth?</li>
+      <li><strong>Completeness 1–5</strong> — does it cover the key relationships?</li>
+      <li><strong>Clinical soundness 1–5</strong> — would a pharmacist call it misleading?</li>
+      <li><strong>Pairwise preference</strong> — judge picks A or B blinded (this is the headline result, see next section).</li>
+    </ul>
+  </div>
+</section>
+
+<!-- 6. Headline -->
+<section>
+  <span class="sec-tag">6 · The headline result</span>
+  <h2>One adequately-powered test: pairwise preference at n=200</h2>
+  <p>
+    For each of the 200 questions, the Haiku judge sees A3's answer
+    side-by-side with A1's answer (blinded, randomly ordered) and picks
+    which one better answers the question.
+  </p>
+
+  <div class="card">
+    <p style="margin: 0; font-size: 14px;">
+      <strong>Sign test:</strong> at n=200, we can detect a 55%+ preference
+      rate with >0.95 power at α=0.05. That means if A3 wins 110+ of the
+      200 non-tie comparisons, we have strong evidence that GraphRAG
+      beats strong naïve RAG.
+    </p>
+  </div>
+
+  <div class="callout">
+    <span class="callout-label">Why this one test, and not per-stratum</span>
+    With only 25–40 questions per stratum, statistical power is too low to
+    make per-stratum claims rigorously (you'd need ~170 per stratum for the
+    effects we care about). The per-stratum tables are still <em>reported</em>
+    — they show <em>where</em> A3 wins or loses — but they're descriptive,
+    not inferential. The pairwise test is the one we'd stake the headline on.
+  </div>
+</section>
+
+<!-- 7. Hypotheses -->
+<section>
+  <span class="sec-tag">7 · The hypotheses</span>
+  <h2>What "GraphRAG won" actually means, pre-declared</h2>
+  <p>
+    Three falsifiable hypotheses, committed to a file <em>before</em> any
+    answers are generated. This prevents moving the goalposts after the
+    fact.
+  </p>
+
+  <div class="hyp">
+    <span class="name">H1 · Primary</span>
+    <div class="claim">A3 beats A1 on blinded pairwise preference, >55% of the time</div>
+    <div class="test">Tested with: sign test on 200 pairwise comparisons. Decisive.</div>
+  </div>
+  <div class="hyp">
+    <span class="name">H2 · Multi-hop</span>
+    <div class="claim">On S3 (multi-hop questions), A3 entity recall + PMID precision both exceed A1 by ≥10 percentage points</div>
+    <div class="test">Tested with: per-stratum rule-based metrics. Descriptive — explains <em>where</em> the H1 win comes from.</div>
+  </div>
+  <div class="hyp">
+    <span class="name">H3 · No regression</span>
+    <div class="claim">On S1 (easy / well-known facts), A3 is within 5pp of A0 — adding graph context doesn't hurt easy questions</div>
+    <div class="test">Tested with: descriptive equivalence check on S1.</div>
+  </div>
+</section>
+
+<!-- 8. Threats -->
+<section>
+  <span class="sec-tag">8 · Honest threats to validity</span>
+  <h2>What could go wrong (acknowledged, not hidden)</h2>
+  <p>
+    Every eval has weaknesses. Listing them transparently makes the writeup
+    stronger, not weaker. A mentor will notice these anyway — better to
+    surface them ourselves.
+  </p>
+
+  <div class="card" style="padding: 6px 18px;">
+    <div class="threat">
+      <span class="sev med">Med</span>
+      <div><strong>Training contamination</strong> — PharmGKB is public; the LLM may have seen it. Mitigation: held-out split + 15 fresh-phrasing questions.</div>
+    </div>
+    <div class="threat">
+      <span class="sev high">High</span>
+      <div><strong>A1 being a strawman</strong> — A weak naïve-RAG makes A3 look better than it is. Mitigation: A1's exact config (embedder, reranker, K, query rewriting) is pre-registered. If we can't stand up the steelman, the eval pauses.</div>
+    </div>
+    <div class="threat">
+      <span class="sev med">Med</span>
+      <div><strong>Judge self-preference (Claude judging Claude)</strong> — Even with Opus generating and Haiku judging, both are Claude. Cross-family judging (Gemini) would be stronger. Mitigation: lean on rule-based metrics (judge-independent); pairwise preference; human spot-check 20 ratings.</div>
+    </div>
+    <div class="threat">
+      <span class="sev med">Med</span>
+      <div><strong>Blinding-via-style</strong> — A3's structured prose is identifiable even with labels stripped. Mitigation: prose normalization before judging.</div>
+    </div>
+    <div class="threat">
+      <span class="sev low">Low</span>
+      <div><strong>Held-out rows ≠ held-out facts</strong> — Other TSVs may redundantly contain the same association. Both A1 and A3 get to use those rows, so the asymmetry is small.</div>
+    </div>
+    <div class="threat">
+      <span class="sev med">Med</span>
+      <div><strong>Single model</strong> — Results may not generalize to GPT or Gemini. Stated clearly; replicate on a second model as future work.</div>
+    </div>
+  </div>
+</section>
+
+<!-- 9. Pre-flight -->
+<section>
+  <span class="sec-tag">9 · Sanity checks before we run anything</span>
+  <h2>Five gates before generating 800 answers</h2>
+  <p class="muted">If any of these fail, the eval pauses and we fix it first — not after burning compute.</p>
+
+  <div class="flow">
+    <div class="step"><div class="num">1</div><div class="body">
+      <strong>Question quality ≥85%</strong>
+      <span>Hand-rate 30 auto-generated questions on 0/1 (usable). If fewer than 85% are good, fix the templates.</span>
+    </div></div>
+    <div class="step"><div class="num">2</div><div class="body">
+      <strong>Gold-answer verification</strong>
+      <span>Manually verify the same 30 against the held-out PharmGKB row — catches template bugs.</span>
+    </div></div>
+    <div class="step"><div class="num">3</div><div class="body">
+      <strong>A1 sanity</strong>
+      <span>Run the naïve-RAG arm on 5 questions; confirm it actually retrieves reasonable chunks. A broken steelman invalidates the comparison.</span>
+    </div></div>
+    <div class="step"><div class="num">4</div><div class="body">
+      <strong>Judge calibration</strong>
+      <span>Haiku rates 20 answers; you rate the same 20; correlation ≥ 0.7 required.</span>
+    </div></div>
+    <div class="step"><div class="num">5</div><div class="body">
+      <strong>Pre-registration</strong>
+      <span>Commit metric definitions, A1 config, sample sizes, and decision rules to a file <em>before</em> generating answers. Frozen.</span>
+    </div></div>
+  </div>
+</section>
+
+<!-- 10. Expected outcome -->
+<section>
+  <span class="sec-tag">10 · What success looks like</span>
+  <h2>The two outcomes we'd be happy with</h2>
+  <div class="verdict">
+    <h3>A mixed result with a clear story is a better outcome than a clean win.</h3>
+    <p>
+      The hostile reviewer's prior is that A3 wins H1 with the win
+      concentrated in <strong>multi-hop reasoning (S3)</strong>,
+      <strong>negative controls (S6)</strong>, and
+      <strong>out-of-distribution refusal (S7)</strong>; ties A0 on
+      <strong>easy questions (S1)</strong>; and shows a characterizable set
+      of remaining failure modes.
+    </p>
+    <p style="margin-top: 14px;">
+      That's the version that demonstrates <em>understanding</em> — where
+      the graph helps, where it doesn't, and why. A clean across-the-board
+      win that doesn't survive scrutiny is a worse result, not a better one.
+    </p>
+  </div>
+</section>
+
+</div>
+
+<footer>
+  Polygence GraphRAG — evaluation methodology · v2 (post stress-test) · design-only, no code yet
+</footer>
+
+</body>
+</html>

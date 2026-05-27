@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import csv
 import json
+import os
 import re
 import sys
 from collections import defaultdict
@@ -37,6 +38,24 @@ csv.field_size_limit(sys.maxsize)
 
 ROOT = Path(__file__).resolve().parent.parent
 DATA_OUT = ROOT / "data"
+
+# Eval support: when HELDOUT_VARIANTS=<path> is set, skip clinicalVariants
+# rows whose stable hash appears in that file (one hash per line). Used by
+# eval/rebuild_heldout.py to produce a reduced graph for the held-out test.
+# Also honors HELDOUT_OUTPUT to write to a different file than data/graph.json.
+HELDOUT_FILE = os.environ.get("HELDOUT_VARIANTS")
+HELDOUT_OUTPUT_NAME = os.environ.get("HELDOUT_OUTPUT")  # e.g. "graph_heldout.json"
+
+def _row_hash(row: dict) -> str:
+    """Stable hash of a clinicalVariants row, independent of column order."""
+    keys = ("variant", "gene", "type", "level of evidence", "chemicals", "phenotypes")
+    return "|".join((row.get(k) or "").strip() for k in keys)
+
+_HELDOUT_HASHES: set[str] = set()
+if HELDOUT_FILE:
+    with open(HELDOUT_FILE) as _fh:
+        _HELDOUT_HASHES = {ln.strip() for ln in _fh if ln.strip()}
+    print(f"[heldout] loaded {len(_HELDOUT_HASHES)} hashes from {HELDOUT_FILE}", file=sys.stderr)
 
 # --- curated drug-class definitions for the anesthesia demo ----------------
 DRUG_CLASSES: dict[str, list[str]] = {
@@ -215,6 +234,10 @@ def build_graph(genes, drugs, phenotypes):
 
     # ---- clinical-variants backbone --------------------------------------
     clin_rows = list(read_tsv(ROOT / "clinicalVariants.tsv"))
+    if _HELDOUT_HASHES:
+        before = len(clin_rows)
+        clin_rows = [r for r in clin_rows if _row_hash(r) not in _HELDOUT_HASHES]
+        print(f"[heldout] dropped {before - len(clin_rows)} clinicalVariants rows", file=sys.stderr)
     # we'll iterate over (gene, row) pairs so a multi-gene row writes one edge
     # per gene rather than a synthetic compound-gene node.
     expanded_rows: list[tuple[str, dict]] = []
@@ -480,8 +503,9 @@ def main():
     print(f"  seed nodes={len(seed['nodes'])}  seed edges={len(seed['edges'])}",
           file=sys.stderr)
 
-    print("Writing JSON artifacts to data/...", file=sys.stderr)
-    (DATA_OUT / "graph.json").write_text(
+    out_name = HELDOUT_OUTPUT_NAME or "graph.json"
+    print(f"Writing JSON artifacts to data/ (graph file: {out_name})...", file=sys.stderr)
+    (DATA_OUT / out_name).write_text(
         json.dumps({"nodes": list(nodes.values()), "edges": edges}, indent=None)
     )
     (DATA_OUT / "seed_anesthesia.json").write_text(json.dumps(seed, indent=None))

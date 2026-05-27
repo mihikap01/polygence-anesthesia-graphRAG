@@ -1,0 +1,121 @@
+variant	gene	type	level of evidence	chemicals	phenotypes
+rs7294	VKORC1	Dosage	1B	warfarin	
+rs12979860	IFNL3,IFNL4	Efficacy	1A	peginterferon alfa-2a,peginterferon alfa-2b,ribavirin,telaprevir	Chronic hepatitis C virus infection
+rs1801159	DPYD	Toxicity	1A	fluorouracil	Neoplasms
+rs3812718	SCN1A	Dosage	2B	carbamazepine	Epilepsy
+SLCO1B1*1, SLCO1B1*5, SLCO1B1*15, SLCO1B1*37	SLCO1B1	Metabolism/PK	1A	pitavastatin	
+CYP2D6*1, CYP2D6*4, CYP2D6*5, CYP2D6*6, CYP2D6*10, CYP2D6*41	CYP2D6	Metabolism/PK	1A	aripiprazole	Psychotic Disorder,Schizoaffective disorder,Schizophrenia
+rs267606619	MT-RNR1	Toxicity	1A	streptomycin	Ototoxicity
+CYP2D6*1, CYP2D6*3, CYP2D6*4, CYP2D6*5	CYP2D6	Metabolism/PK	1A	imipramine	Major Depressive Disorder,Mental Disorders
+rs71647871	CES1	Efficacy	2B	clopidogrel	
+HLA-B*57:01	HLA-B	Toxicity	1A	abacavir	Drug Hypersensitivity,HIV infectious disease
+rs9923231	VKORC1	Toxicity	2A	warfarin	Hemorrhage
+HLA-A*33:03	HLA-A	Toxicity	2B	allopurinol	Drug Hypersensitivity,Stevens-Johnson Syndrome
+rs121908757	CFTR	Efficacy	1A	ivacaftor	Cystic Fibrosis
+rs72549309	DPYD	Other	1A	fluorouracil	
+rs397508288	CFTR	Efficacy	1A	ivacaftor	Cystic Fibrosis
+rs118192168	RYR1	Toxicity	1A	desflurane,enflurane,halothane,isoflurane,methoxyflurane,sevoflurane,succinylcholine	Malignant Hyperthermia
+rs2108622	CYP4F2	Dosage	1A	warfarin	
+rs1801160	DPYD	Toxicity	1A	fluorouracil	Neoplasms
+CYP2C19*1, CYP2C19*2	CYP2C19	Metabolism/PK	1A	trimipramine	
+rs267606617	MT-RNR1	Toxicity	1A	streptomycin	Ototoxicity
+rs267606618	MT-RNR1	Toxicity	1A	gentamicin	Ototoxicity
+rs397508602	CFTR	Efficacy	1A	ivacaftor	Cystic Fibrosis
+NAT2*4, NAT2*5, NAT2*6, NAT2*7, NAT2*16	NAT2	Metabolism/PK	1A	hydralazine	
+rs1801158	DPYD	Toxicity	1A	capecitabine	Neoplasms
+rs397508513	CFTR	Efficacy	1A	ivacaftor	Cystic Fibrosis
+rs3918290	DPYD	Toxicity	1A	fluorouracil	Neoplasms
+HLA-B*13:01, HLA-B*15:02, HLA-B*38:02	HLA-B	Toxicity	2A	sulfamethoxazole / trimethoprim	Stevens-Johnson Syndrome,Toxic Epidermal Necrolysis
+rs11881222	IFNL3	Efficacy	2A	peginterferon alfa-2a,peginterferon alfa-2b,ribavirin	Hepatitis C virus infection,HIV infectious disease
+CYP2B6*1, CYP2B6*4, CYP2B6*6, CYP2B6*18	CYP2B6	Metabolism/PK	2A	methadone	Heroin Dependence,Opioid-Related Disorders
+HLA-DPB1*03:01	HLA-DPB1	Toxicity	2B	aspirin	Asthma
+rs118192122	RYR1	Toxicity	1A	desflurane,enflurane,halothane,isoflurane,methoxyflurane,sevoflurane,succinylcholine	Malignant Hyperthermia
+rs267606617	MT-RNR1	Toxicity	1A	kanamycin	Ototoxicity
+rs772226819	CACNA1S	Toxicity	1A	halothane	Malignant Hyperthermia
+rs80282562	CFTR	Efficacy	1A	ivacaftor	Cystic Fibrosis
+rs4149056	SLCO1B1	Toxicity	1A	rosuvastatin	statin-related myopathy
+rs1801265	DPYD	Toxicity	1A	capecitabine	Neoplasms
+CYP2D6*1, CYP2D6*2, CYP2D6*3, CYP2D6*4, CYP2D6*5, CYP2D6*6, CYP2D6*7, CYP2D6*9, CYP2D6*10, CYP2D6*10x2, CYP2D6*11, CYP2D6*17, CYP2D6*21, CYP2D6*36, CYP2D6*41	CYP2D6	Efficacy	1A	tamoxifen	Breast Neoplasms
+CYP2D6*1, CYP2D6*1xN, CYP2D6*3, CYP2D6*4, CYP2D6*5, CYP2D6*6	CYP2D6	Metabolism/PK	2A	mirtazapine	
+rs16969968	CHRNA5	Toxicity	2B	nicotine	Tobacco Use Disorder
+rs56038477	DPYD	Toxicity	1A	fluorouracil	Neoplasms
+CYP2D6*1, CYP2D6*2, CYP2D6*2xN, CYP2D6*3, CYP2D6*4, CYP2D6*4xN, CYP2D6*5, CYP2D6*6, CYP2D6*8, CYP2D6*9, CYP2D6*10, CYP2D6*15, CYP2D6*17, CYP2D6*18, CYP2D6*21, CYP2D6*29, CYP2D6*36xN, CYP2D6*38	CYP2D6	Metabolism/PK	2A	debrisoquine	
+CYP2D6*1, CYP2D6*4, CYP2D6*5, CYP2D6*10, CYP2D6*21, CYP2D6*36	CYP2D6	Metabolism/PK	1A	flecainide	Cardiac rhythm disease
+rs267606617	MT-RNR1	Toxicity	1A	aminoglycoside antibacterials	Ototoxicity
+SLCO1B1*1, SLCO1B1*5, SLCO1B1*15	SLCO1B1	Toxicity	1A	atorvastatin	
+rs4961	ADD1	Efficacy	2B	hydrochlorothiazide	Essential hypertension,Hypertension
+HLA-DRB1*01:01	HLA-DRB1	Toxicity	2B	nevirapine	
+rs118192124	RYR1	Toxicity	1A	desflurane,enflurane,halothane,isoflurane,methoxyflurane,sevoflurane,succinylcholine	Malignant Hyperthermia
+rs59086055	DPYD	Toxicity	1A	fluorouracil	Neoplasms
+CYP2D6*1, CYP2D6*2, CYP2D6*3, CYP2D6*4, CYP2D6*5, CYP2D6*6, CYP2D6*10, CYP2D6*17, CYP2D6*29, CYP2D6*35, CYP2D6*41	CYP2D6	Metabolism/PK	1A	tamoxifen	Breast Neoplasms
+rs75017182	DPYD	Toxicity	1A	capecitabine	Neoplasms
+NAT2*6, NAT2*7, NAT2*14, NAT2*16	NAT2	Toxicity	1A	hydralazine	Hypertension
+rs4149056	SLCO1B1	Toxicity	1A	atorvastatin	statin-related myopathy
+CYP2C9*1, CYP2C9*2, CYP2C9*3	CYP2C9	Metabolism/PK	1A	ibuprofen	
+rs1800559	CACNA1S	Toxicity	1A	desflurane	Malignant Hyperthermia
+rs75527207	CFTR	Efficacy	1A	ivacaftor	Cystic Fibrosis
+CYP2D6*1, CYP2D6*1xN, CYP2D6*2, CYP2D6*3, CYP2D6*4, CYP2D6*5, CYP2D6*6, CYP2D6*10, CYP2D6*41	CYP2D6	Toxicity	1A	amitriptyline	Depressive Disorder
+rs193922762	RYR1	Toxicity	1A	desflurane,enflurane,halothane,isoflurane,methoxyflurane,sevoflurane,succinylcholine	Malignant Hyperthermia
+rs115232898	DPYD	Other	1A	fluorouracil	
+rs11971167	CFTR	Efficacy	1A	ivacaftor	Cystic Fibrosis
+rs2231142	ABCG2	Metabolism/PK	1A	rosuvastatin	
+rs8099917	IFNL3	Efficacy	1B	interferons,peginterferon alfa-2a,peginterferon alfa-2b,ribavirin	Chronic hepatitis C virus infection
+UGT1A1*1, UGT1A1*6, UGT1A1*28	UGT1A1	Toxicity	1B	FOLFIRI,irinotecan	Diarrhea
+CYP2C19*1, CYP2C19*2, CYP2C19*3, CYP2C19*17	CYP2C19	Metabolism/PK	1A	amitriptyline	Major Depressive Disorder,Mental Disorders
+rs397508759	CFTR	Efficacy	1A	ivacaftor	Cystic Fibrosis
+rs67376798	DPYD	Toxicity	1A	capecitabine	Neoplasms
+rs113993960	CFTR	Efficacy	1A	ivacaftor / tezacaftor	Cystic Fibrosis
+CYP2D6*1, CYP2D6*2, CYP2D6*2xN, CYP2D6*4, CYP2D6*5, CYP2D6*6, CYP2D6*9, CYP2D6*10	CYP2D6	Metabolism/PK	1A	desipramine	Major Depressive Disorder,Mental Disorders
+rs267606619	MT-RNR1	Toxicity	1A	tobramycin	Ototoxicity
+SLCO1B1*1, SLCO1B1*5, SLCO1B1*15	SLCO1B1	Metabolism/PK	1A	simvastatin,simvastatin acid	
+HLA-B*59:01	HLA-B	Toxicity	2A	methazolamide	Stevens-Johnson Syndrome,Toxic Epidermal Necrolysis
+HLA-C*03:02	HLA-C	Toxicity	2B	allopurinol	Severe Cutaneous Adverse Reactions,Stevens-Johnson Syndrome,Toxic Epidermal Necrolysis
+CYP2C9*1, CYP2C9*2, CYP2C9*3, CYP2C9*5, CYP2C9*6, CYP2C9*11	CYP2C9	Toxicity	1A	warfarin	Hemorrhage
+rs9923231	VKORC1	Toxicity	2A	phenprocoumon	Hemorrhage,over-anticoagulation,time above therapeutic range
+CYP2C9*1, CYP2C9*2, CYP2C9*3	CYP2C9	Toxicity	2A	acenocoumarol	Hemorrhage
+rs772226819	CACNA1S	Toxicity	1A	desflurane	Malignant Hyperthermia
+rs9934438	VKORC1	Dosage	1B	warfarin	
+rs4149056	SLCO1B1	Metabolism/PK	1A	atorvastatin	
+CYP2D6*1, CYP2D6*2, CYP2D6*3, CYP2D6*4, CYP2D6*5, CYP2D6*10, CYP2D6*17	CYP2D6	Metabolism/PK	1A	haloperidol	Schizophrenia
+rs118192176	RYR1	Toxicity	1A	desflurane,enflurane,halothane,isoflurane,methoxyflurane,sevoflurane,succinylcholine	Malignant Hyperthermia
+CYP2D6*1, CYP2D6*3, CYP2D6*4, CYP2D6*5, CYP2D6*6, CYP2D6*10	CYP2D6	Metabolism/PK	1A	venlafaxine	Depressive Disorder,Obsessive-Compulsive Disorder
+rs56005131	DPYD	Other	1A	fluorouracil	
+rs4149056	SLCO1B1	Toxicity	1A	lovastatin	statin-related myopathy
+HLA-B*57:01	HLA-B	Toxicity	1A	flucloxacillin	Drug-induced liver injury
+NUDT15*1, NUDT15*3, NUDT15*4, NUDT15*5, NUDT15*6, NUDT15*7, NUDT15*8, NUDT15*9	NUDT15	Dosage	1A	mercaptopurine	Acute lymphoblastic leukemia
+CYP2C19*1, CYP2C19*2, CYP2C19*3, CYP2C19*17	CYP2C19	Metabolism/PK	1A	escitalopram	Major Depressive Disorder,Mental Disorders
+rs77834169	CFTR	Efficacy	1A	ivacaftor	Cystic Fibrosis
+rs1799963	F2	Toxicity	2B	hormonal contraceptives for systemic use	Stroke,Venous Thrombosis
+CYP2C9*1, CYP2C9*2, CYP2C9*3	CYP2C9	Dosage	1B	acenocoumarol	
+rs772226819	CACNA1S	Toxicity	1A	methoxyflurane	Malignant Hyperthermia
+UGT1A1*1, UGT1A1*6, UGT1A1*28	UGT1A1	Metabolism/PK	1B	SN-38	
+SLCO1B1*1, SLCO1B1*5, SLCO1B1*15	SLCO1B1	Metabolism/PK	1A	lovastatin,lovastatin acid	
+rs121909041	CFTR	Efficacy	1A	ivacaftor	Cystic Fibrosis
+CYP3A4*1, CYP3A4*18, CYP3A4*20, CYP3A4*22	CYP3A4	Metabolism/PK	2A	tacrolimus	Kidney Transplantation,Laparoscopic sleeve gastrectomy,Liver transplantation,Lung transplantation
+TPMT*1, TPMT*2, TPMT*3A, TPMT*3B, TPMT*3C, TPMT*7, TPMT*9, TPMT*10, TPMT*12, TPMT*13, TPMT*16, TPMT*17, TPMT*18, TPMT*23	TPMT	Metabolism/PK	1A	thioguanine	Crohn Disease
+CYP2C9*1, CYP2C9*2, CYP2C9*3	CYP2C9	Metabolism/PK	1A	tenoxicam	
+rs267606619	MT-RNR1	Toxicity	1A	aminoglycoside antibacterials	Ototoxicity
+rs121434569	EGFR	Efficacy	2B	erlotinib	Adenocarcinoma,Drug Resistance,Lung Neoplasms,Non-Small Cell Lung Carcinoma
+rs2231142	ABCG2	Dosage	1A	allopurinol	Gout
+rs121918596	RYR1	Toxicity	1A	desflurane,enflurane,halothane,isoflurane,methoxyflurane,sevoflurane,succinylcholine	Malignant Hyperthermia
+rs4149056	SLCO1B1	Metabolism/PK	1A	lovastatin,lovastatin acid	
+CYP2C9*1, CYP2C9*2, CYP2C9*3	CYP2C9	Metabolism/PK	1A	piroxicam	
+rs267606617	MT-RNR1	Toxicity	1A	tobramycin	Ototoxicity
+rs121909020	CFTR	Efficacy	1A	ivacaftor	Cystic Fibrosis
+rs77932196	CFTR	Efficacy	1A	ivacaftor	Cystic Fibrosis
+rs121908752	CFTR	Efficacy	1A	ivacaftor	Cystic Fibrosis
+CYP2D6*1, CYP2D6*1xN, CYP2D6*2, CYP2D6*2xN	CYP2D6	Toxicity	1A	tramadol	Cardiotoxicity,Drug Toxicity
+rs193922748	RYR1	Toxicity	1A	desflurane,enflurane,halothane,isoflurane,methoxyflurane,sevoflurane,succinylcholine	Malignant Hyperthermia
+rs1800559	CACNA1S	Toxicity	1A	succinylcholine	Malignant Hyperthermia
+CYP2D6*1, CYP2D6*1xN, CYP2D6*2, CYP2D6*2xN, CYP2D6*3, CYP2D6*4, CYP2D6*5, CYP2D6*6, CYP2D6*10, CYP2D6*17	CYP2D6	Metabolism/PK	1A	nortriptyline	Major Depressive Disorder
+rs2884737	VKORC1	Dosage	2A	warfarin	
+rs7270101	ITPA	Toxicity	2B	peginterferon alfa-2b,ribavirin	Anemia,Chronic hepatitis C virus infection
+CYP2D6*1, CYP2D6*1xN, CYP2D6*2, CYP2D6*3, CYP2D6*4, CYP2D6*5, CYP2D6*6, CYP2D6*9, CYP2D6*10, CYP2D6*17, CYP2D6*41	CYP2D6	Metabolism/PK	1A	tramadol	
+HLA-C*01:02	HLA-C	Toxicity	2B	methazolamide	Stevens-Johnson Syndrome,Toxic Epidermal Necrolysis
+rs78769542	CFTR	Efficacy	1A	ivacaftor	Cystic Fibrosis
+SLCO1B1*1, SLCO1B1*5, SLCO1B1*15	SLCO1B1	Toxicity	1A	simvastatin	statin-related myopathy
+rs193922878	RYR1	Toxicity	1A	desflurane,enflurane,halothane,isoflurane,methoxyflurane,sevoflurane,succinylcholine	Malignant Hyperthermia
+rs121918595	RYR1	Toxicity	1A	desflurane,enflurane,halothane,isoflurane,methoxyflurane,sevoflurane,succinylcholine	Malignant Hyperthermia
+rs3745274	CYP2B6	Metabolism/PK	2A	nevirapine	HIV infectious disease
+rs71647871	CES1	Metabolism/PK	2B	clopidogrel	
+CYP2D6*1, CYP2D6*1xN, CYP2D6*2xN, CYP2D6*3, CYP2D6*4, CYP2D6*5, CYP2D6*9, CYP2D6*10, CYP2D6*35, CYP2D6*35xN, CYP2D6*41	CYP2D6	Metabolism/PK	1A	doxepin	
