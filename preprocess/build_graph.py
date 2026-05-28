@@ -503,13 +503,20 @@ def main():
     print(f"  seed nodes={len(seed['nodes'])}  seed edges={len(seed['edges'])}",
           file=sys.stderr)
 
-    out_name = HELDOUT_OUTPUT_NAME or "graph.json"
-    print(f"Writing JSON artifacts to data/ (graph file: {out_name})...", file=sys.stderr)
-    (DATA_OUT / out_name).write_text(
+    # When HELDOUT_OUTPUT is set, suffix ALL three artifacts so the live
+    # web app's data/{graph,seed_anesthesia,search_index}.json stay untouched.
+    if HELDOUT_OUTPUT_NAME:
+        suffix = "_heldout"
+        graph_name = HELDOUT_OUTPUT_NAME
+    else:
+        suffix = ""
+        graph_name = "graph.json"
+    print(f"Writing JSON artifacts to data/ (graph file: {graph_name})...", file=sys.stderr)
+    (DATA_OUT / graph_name).write_text(
         json.dumps({"nodes": list(nodes.values()), "edges": edges}, indent=None)
     )
-    (DATA_OUT / "seed_anesthesia.json").write_text(json.dumps(seed, indent=None))
-    (DATA_OUT / "search_index.json").write_text(
+    (DATA_OUT / f"seed_anesthesia{suffix}.json").write_text(json.dumps(seed, indent=None))
+    (DATA_OUT / f"search_index{suffix}.json").write_text(
         json.dumps(build_search_index(nodes), indent=None)
     )
     print("Done.", file=sys.stderr)

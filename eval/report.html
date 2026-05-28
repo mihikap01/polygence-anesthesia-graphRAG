@@ -1,0 +1,444 @@
+<!doctype html><html><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>GraphRAG eval — results</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root { --bg:#fbf8f3; --fg:#283543; --muted:#5a6b7d; --card:#fff;
+  --primary:hsl(195 35% 42%); --primary-bg:hsl(195 50% 95%);
+  --border:hsl(215 15% 88%); --accent-bg:hsl(200 40% 94%);
+  --soft:0 2px 12px -2px rgba(30,50,80,.08), 0 1px 3px -1px rgba(30,50,80,.04); }
+* { box-sizing:border-box; }
+body { margin:0; background:var(--bg); color:var(--fg); font-family:Inter,system-ui,sans-serif; line-height:1.6; }
+.wrap { max-width:980px; margin:0 auto; padding:40px 24px; }
+h1 { font-size:32px; font-weight:600; letter-spacing:-.02em; margin:0 0 8px; }
+h2 { font-size:22px; margin:48px 0 12px; font-weight:600; }
+h3 { font-size:16px; margin:24px 0 8px; font-weight:600; }
+.pill { display:inline-flex; gap:8px; align-items:center; padding:5px 12px; border-radius:999px;
+  border:1px solid var(--border); background:var(--card); font-size:12px; color:var(--muted); margin-bottom:14px;
+  box-shadow:var(--soft); }
+.pill .dot { width:8px; height:8px; border-radius:50%; background:var(--primary); }
+.muted { color:var(--muted); }
+table { width:100%; border-collapse:collapse; margin:14px 0; background:var(--card);
+  border-radius:14px; overflow:hidden; box-shadow:var(--soft); font-size:14px; }
+th, td { padding:9px 14px; text-align:left; border-bottom:1px solid var(--border); }
+th { background:var(--accent-bg); font-size:12px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); }
+td.right, th.right { text-align:right; }
+tr.highlight td { background:var(--primary-bg); font-weight:500; }
+.callout { background:var(--primary-bg); border-left:4px solid var(--primary); padding:14px 18px;
+  border-radius:0 12px 12px 0; margin:14px 0; }
+.callout-label { display:block; font-size:11px; font-weight:700; letter-spacing:.08em;
+  text-transform:uppercase; color:var(--primary); margin-bottom:4px; }
+.examples { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin:8px 0 20px; }
+.example { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:10px 12px; }
+.arm-tag { font-size:11px; font-weight:600; color:var(--primary); margin-bottom:4px; }
+pre { white-space:pre-wrap; font-size:12px; margin:0; font-family:ui-monospace,monospace; color:var(--fg); }
+code { background:var(--accent-bg); padding:1px 6px; border-radius:6px; font-family:ui-monospace,monospace; font-size:13px; }
+footer { color:var(--muted); font-size:12px; margin-top:48px; padding-top:24px; border-top:1px solid var(--border); }
+</style></head><body><div class="wrap"><span class="pill"><span class="dot"></span> GraphRAG eval · 4 arms × 187 questions</span><h1>GraphRAG evaluation — results</h1><p class="muted">Cross-arm comparison on a held-out PharmGKB question set. Generator: Claude Sonnet 4. Judge: Claude Haiku 4.5 (cross-size, within-Claude). See <code>eval/preregistration.md</code> for design.</p>
+    <h2>Key findings</h2>
+    <div class="callout">
+      <span class="callout-label">H1 (primary): NOT SUPPORTED</span>
+      GraphRAG (A3) vs. strong naïve RAG (A1): <strong>48.9% A3-preferred</strong>
+      (91–95, sign-test p=0.826). This is a statistical tie — the graph layer
+      did <strong>not</strong> beat strong hybrid retrieval on this question set. The pre-registered
+      bar was &gt;55% with p&lt;0.05.
+    </div>
+    <ul>
+      <li><strong>H2 (multi-hop): not supported.</strong> On S3 (multi-hop), A3 was preferred only
+        42.5% of the time — it <em>lost</em> to A1. This matches the hostile reviewer's prior:
+        PharmGKB rows are already denormalised, so a strong retriever recovers multi-hop facts without
+        needing graph traversal.</li>
+      <li><strong>H3 (no regression): mild regression.</strong> On S1 (well-known facts) A3 was
+        preferred only 35.0% vs A1 — the extra graph context reads as
+        noise on trivially-known questions.</li>
+      <li><strong>A3's one genuine win: out-of-distribution refusal (S7, 60.0%).</strong> When a
+        drug isn't in the graph, A3 cleanly refuses; A1's retrieval always returns <em>something</em>,
+        tempting it to answer. This is the clearest evidence that graph structure helps — knowing what's
+        <em>absent</em>.</li>
+      <li><strong>A3's apparent S4 win (96.0%) is a confound, not a win.</strong> The held-out
+        split removed <code>clinicalVariants</code> rows but not <code>relationships.tsv</code> rows, so
+        A1 could still retrieve the (correct) PMIDs while A3's graph genuinely lost them. The judge then
+        <em>preferred A3's refusal over A1's correct citation</em> — rewarding caution over verifiable
+        grounding.</li>
+      <li><strong>The meta-finding — preference ≠ correctness.</strong> A0 (no context) "won" the
+        preference test (27.8% A3-preferred, p=0.0000 — i.e. A0 strongly favoured),
+        yet A0's cited PMIDs were real only <strong>31.7%</strong> of the time vs.
+        66.7% for A3. The LLM judge is fooled by fluent, confident prose and cannot detect
+        fabricated citations. This is precisely why the design pairs subjective preference with
+        deterministic rule-based metrics.</li>
+    </ul>
+    <div class="callout">
+      <span class="callout-label">Bottom line</span>
+      On this PharmGKB-derived benchmark, with Claude Sonnet as the generator, <strong>the GraphRAG
+      layer did not demonstrate an advantage over strong hybrid retrieval</strong>, and both retrieval
+      arms were dispreferred by the LLM judge relative to the model's own parametric answers — which
+      are themselves unreliable (high PMID fabrication). The honest conclusion: <em>for this domain and
+      model, the value of the graph is concentrated in knowing what it does NOT contain (refusal), not
+      in multi-hop reasoning.</em> See the threats/deviations section for why these numbers should be
+      read with caution.
+    </div>
+    <h2>Headline — pairwise preference (the H1 primary test)</h2><table><thead><tr><th>Comparison</th><th class="right">n</th><th class="right">A3 wins</th><th class="right">Other wins</th><th class="right">Ties</th><th class="right">A3 preferred</th><th class="right">95% CI</th><th class="right">p</th><th>Verdict</th></tr></thead><tbody>
+<tr><td>A3 vs A0</td><td class="right">187</td><td class="right">52</td><td class="right">135</td><td class="right">0</td><td class="right"><strong>27.8%</strong></td><td class="right">21.9% – 34.6%</td><td class="right">0.0000</td><td>Other arm wins</td></tr>
+<tr><td>A3 vs A1</td><td class="right">186</td><td class="right">91</td><td class="right">95</td><td class="right">0</td><td class="right"><strong>48.9%</strong></td><td class="right">41.8% – 56.1%</td><td class="right">0.8260</td><td>Inconclusive</td></tr>
+</tbody></table><div class="callout">
+        <span class="callout-label">How to read this</span>
+        For each question, the Haiku judge sees both answers blinded, in randomized order, and picks
+        the better one. <strong>A3 preferred &gt; 55% with p&lt;0.05 supports H1</strong> (GraphRAG
+        beats the baseline). Wilson-score 95% CI; sign-test p.
+    </div><h2>Rule-based metrics (overall)</h2><table><thead><tr><th>Arm</th><th class="right">n</th><th class="right">Errors</th><th class="right">Answer chars</th><th class="right">Latency</th><th class="right">Entity recall</th><th class="right">PMID exists</th></tr></thead><tbody>
+<tr class=""><td>A0 — no context</td><td class="right">187</td><td class="right">0</td><td class="right">1286.4</td><td class="right">23.6s</td><td class="right">91.4%</td><td class="right">31.7%</td></tr>
+<tr class=""><td>A1 — naïve RAG</td><td class="right">187</td><td class="right">1</td><td class="right">1087.9</td><td class="right">13.7s</td><td class="right">90.2%</td><td class="right">100.0%</td></tr>
+<tr class=""><td>A2 — full subgraph</td><td class="right">187</td><td class="right">0</td><td class="right">931.8</td><td class="right">11.9s</td><td class="right">90.6%</td><td class="right">0.0%</td></tr>
+<tr class="highlight"><td>A3 — GraphRAG</td><td class="right">187</td><td class="right">0</td><td class="right">1170.0</td><td class="right">13.7s</td><td class="right">94.0%</td><td class="right">66.7%</td></tr>
+</tbody></table><h2>Per-stratum breakdown (descriptive)</h2><p class="muted">Per the preregistration, per-stratum metrics are <em>descriptive</em> rather than inferential — sample size per stratum (n=12–40) is too small for hypothesis tests after multiple-comparison correction.</p><h3>S1 — Well-known facts <span class="muted">(n=20)</span></h3>
+<table><thead><tr><th>Arm</th><th class="right">Entity recall</th><th class="right">PMID exists</th>
+</tr></thead><tbody>
+<tr class=""><td>A0 — no context</td><td class="right">82.5%</td><td class="right">33.3%</td></tr>
+<tr class=""><td>A1 — naïve RAG</td><td class="right">80.0%</td><td class="right">100.0%</td></tr>
+<tr class=""><td>A2 — full subgraph</td><td class="right">85.0%</td><td class="right">—</td></tr>
+<tr class="highlight"><td>A3 — GraphRAG</td><td class="right">92.5%</td><td class="right">—</td></tr>
+</tbody></table>
+<table style="margin-top:8px;"><thead><tr><th>Pairwise</th><th class="right">A3 wins</th><th class="right">Other wins</th><th class="right">Ties</th></tr></thead><tbody>
+<tr><td>A3 vs A0</td><td class="right">5</td><td class="right">15</td><td class="right">0</td></tr>
+<tr><td>A3 vs A1</td><td class="right">7</td><td class="right">13</td><td class="right">0</td></tr>
+</tbody></table>
+<h3>S2 — Evidence levels <span class="muted">(n=25)</span></h3>
+<table><thead><tr><th>Arm</th><th class="right">Entity recall</th><th class="right">PMID exists</th>
+<th class="right">Level match</th>
+</tr></thead><tbody>
+<tr class=""><td>A0 — no context</td><td class="right">94.7%</td><td class="right">10.0%</td><td class="right">70.8%</td></tr>
+<tr class=""><td>A1 — naïve RAG</td><td class="right">98.7%</td><td class="right">100.0%</td><td class="right">77.3%</td></tr>
+<tr class=""><td>A2 — full subgraph</td><td class="right">100.0%</td><td class="right">0.0%</td><td class="right">62.5%</td></tr>
+<tr class="highlight"><td>A3 — GraphRAG</td><td class="right">98.7%</td><td class="right">—</td><td class="right">80.0%</td></tr>
+</tbody></table>
+<table style="margin-top:8px;"><thead><tr><th>Pairwise</th><th class="right">A3 wins</th><th class="right">Other wins</th><th class="right">Ties</th></tr></thead><tbody>
+<tr><td>A3 vs A0</td><td class="right">3</td><td class="right">22</td><td class="right">0</td></tr>
+<tr><td>A3 vs A1</td><td class="right">11</td><td class="right">14</td><td class="right">0</td></tr>
+</tbody></table>
+<h3>S3 — Multi-hop reasoning <span class="muted">(n=40)</span></h3>
+<table><thead><tr><th>Arm</th><th class="right">Entity recall</th><th class="right">PMID exists</th>
+</tr></thead><tbody>
+<tr class=""><td>A0 — no context</td><td class="right">82.0%</td><td class="right">22.2%</td></tr>
+<tr class=""><td>A1 — naïve RAG</td><td class="right">71.4%</td><td class="right">100.0%</td></tr>
+<tr class=""><td>A2 — full subgraph</td><td class="right">71.2%</td><td class="right">—</td></tr>
+<tr class="highlight"><td>A3 — GraphRAG</td><td class="right">82.9%</td><td class="right">—</td></tr>
+</tbody></table>
+<table style="margin-top:8px;"><thead><tr><th>Pairwise</th><th class="right">A3 wins</th><th class="right">Other wins</th><th class="right">Ties</th></tr></thead><tbody>
+<tr><td>A3 vs A0</td><td class="right">6</td><td class="right">34</td><td class="right">0</td></tr>
+<tr><td>A3 vs A1</td><td class="right">17</td><td class="right">23</td><td class="right">0</td></tr>
+</tbody></table>
+<h3>S4 — Citation grounding <span class="muted">(n=25)</span></h3>
+<table><thead><tr><th>Arm</th><th class="right">Entity recall</th><th class="right">PMID exists</th>
+<th class="right">PMID correct</th>
+</tr></thead><tbody>
+<tr class=""><td>A0 — no context</td><td class="right">98.0%</td><td class="right">28.2%</td><td class="right">8.7%</td></tr>
+<tr class=""><td>A1 — naïve RAG</td><td class="right">98.0%</td><td class="right">100.0%</td><td class="right">81.8%</td></tr>
+<tr class=""><td>A2 — full subgraph</td><td class="right">96.0%</td><td class="right">0.0%</td><td class="right">0.0%</td></tr>
+<tr class="highlight"><td>A3 — GraphRAG</td><td class="right">100.0%</td><td class="right">66.7%</td><td class="right">8.0%</td></tr>
+</tbody></table>
+<table style="margin-top:8px;"><thead><tr><th>Pairwise</th><th class="right">A3 wins</th><th class="right">Other wins</th><th class="right">Ties</th></tr></thead><tbody>
+<tr><td>A3 vs A0</td><td class="right">8</td><td class="right">17</td><td class="right">0</td></tr>
+<tr><td>A3 vs A1</td><td class="right">24</td><td class="right">1</td><td class="right">0</td></tr>
+</tbody></table>
+<h3>S5 — Long-tail / niche <span class="muted">(n=25)</span></h3>
+<table><thead><tr><th>Arm</th><th class="right">Entity recall</th><th class="right">PMID exists</th>
+</tr></thead><tbody>
+<tr class=""><td>A0 — no context</td><td class="right">98.0%</td><td class="right">43.8%</td></tr>
+<tr class=""><td>A1 — naïve RAG</td><td class="right">100.0%</td><td class="right">100.0%</td></tr>
+<tr class=""><td>A2 — full subgraph</td><td class="right">96.0%</td><td class="right">—</td></tr>
+<tr class="highlight"><td>A3 — GraphRAG</td><td class="right">100.0%</td><td class="right">—</td></tr>
+</tbody></table>
+<table style="margin-top:8px;"><thead><tr><th>Pairwise</th><th class="right">A3 wins</th><th class="right">Other wins</th><th class="right">Ties</th></tr></thead><tbody>
+<tr><td>A3 vs A0</td><td class="right">9</td><td class="right">16</td><td class="right">0</td></tr>
+<tr><td>A3 vs A1</td><td class="right">11</td><td class="right">14</td><td class="right">0</td></tr>
+</tbody></table>
+<h3>S6 — Negative controls <span class="muted">(n=25)</span></h3>
+<table><thead><tr><th>Arm</th><th class="right">Entity recall</th><th class="right">PMID exists</th>
+<th class="right">Refusal correct</th>
+</tr></thead><tbody>
+<tr class=""><td>A0 — no context</td><td class="right">100.0%</td><td class="right">100.0%</td><td class="right">40.0%</td></tr>
+<tr class=""><td>A1 — naïve RAG</td><td class="right">100.0%</td><td class="right">100.0%</td><td class="right">64.0%</td></tr>
+<tr class=""><td>A2 — full subgraph</td><td class="right">98.0%</td><td class="right">—</td><td class="right">72.0%</td></tr>
+<tr class="highlight"><td>A3 — GraphRAG</td><td class="right">100.0%</td><td class="right">—</td><td class="right">48.0%</td></tr>
+</tbody></table>
+<table style="margin-top:8px;"><thead><tr><th>Pairwise</th><th class="right">A3 wins</th><th class="right">Other wins</th><th class="right">Ties</th></tr></thead><tbody>
+<tr><td>A3 vs A0</td><td class="right">12</td><td class="right">13</td><td class="right">0</td></tr>
+<tr><td>A3 vs A1</td><td class="right">10</td><td class="right">15</td><td class="right">0</td></tr>
+</tbody></table>
+<h3>S7 — Out-of-distribution <span class="muted">(n=15)</span></h3>
+<table><thead><tr><th>Arm</th><th class="right">Entity recall</th><th class="right">PMID exists</th>
+<th class="right">Refusal correct</th>
+</tr></thead><tbody>
+<tr class=""><td>A0 — no context</td><td class="right">100.0%</td><td class="right">—</td><td class="right">80.0%</td></tr>
+<tr class=""><td>A1 — naïve RAG</td><td class="right">100.0%</td><td class="right">100.0%</td><td class="right">46.7%</td></tr>
+<tr class=""><td>A2 — full subgraph</td><td class="right">100.0%</td><td class="right">—</td><td class="right">80.0%</td></tr>
+<tr class="highlight"><td>A3 — GraphRAG</td><td class="right">100.0%</td><td class="right">—</td><td class="right">73.3%</td></tr>
+</tbody></table>
+<table style="margin-top:8px;"><thead><tr><th>Pairwise</th><th class="right">A3 wins</th><th class="right">Other wins</th><th class="right">Ties</th></tr></thead><tbody>
+<tr><td>A3 vs A0</td><td class="right">7</td><td class="right">8</td><td class="right">0</td></tr>
+<tr><td>A3 vs A1</td><td class="right">9</td><td class="right">6</td><td class="right">0</td></tr>
+</tbody></table>
+<h3>S8 — Comparative <span class="muted">(n=12)</span></h3>
+<table><thead><tr><th>Arm</th><th class="right">Entity recall</th><th class="right">PMID exists</th>
+</tr></thead><tbody>
+<tr class=""><td>A0 — no context</td><td class="right">75.0%</td><td class="right">—</td></tr>
+<tr class=""><td>A1 — naïve RAG</td><td class="right">81.8%</td><td class="right">100.0%</td></tr>
+<tr class=""><td>A2 — full subgraph</td><td class="right">95.8%</td><td class="right">—</td></tr>
+<tr class="highlight"><td>A3 — GraphRAG</td><td class="right">79.2%</td><td class="right">—</td></tr>
+</tbody></table>
+<table style="margin-top:8px;"><thead><tr><th>Pairwise</th><th class="right">A3 wins</th><th class="right">Other wins</th><th class="right">Ties</th></tr></thead><tbody>
+<tr><td>A3 vs A0</td><td class="right">2</td><td class="right">10</td><td class="right">0</td></tr>
+<tr><td>A3 vs A1</td><td class="right">2</td><td class="right">9</td><td class="right">0</td></tr>
+</tbody></table><h2>Illustrative examples (one per stratum)</h2><p class="muted">All four arms answering the same question, lightly truncated.</p><h3>S2 · S2-001</h3>
+<p class="muted"><strong>Q:</strong> In PharmGKB&#x27;s clinical guidelines, what is the evidence level for the ibuprofen × CYP2C9 association?</p>
+<p class="muted"><strong>Gold:</strong> {&quot;entities&quot;: [&quot;ibuprofen&quot;, &quot;CYP2C9&quot;], &quot;evidence_level&quot;: &quot;1A&quot;, &quot;should_refuse&quot;: false, &quot;answer_summary&quot;: &quot;Evidence level 1A.&quot;}</p>
+<div class='examples'>
+<div class="example"><div class="arm-tag">A0 — no context</div><pre>## CYP2C9 × Ibuprofen — PharmGKB Evidence Level
+
+&gt; ⚠️ **No graph context was retrieved for this query.** The answer below draws on my training knowledge; verify directly at [PharmGKB.org](https://www.pharmgkb.org) before acting on it.
+
+### Best estimate from training knowledge
+
+| Dimension | Detail |
+|-----------|--------|
+| **Evidence level** | **1A** (CPIC guideline exists) |
+| **Basis** | CPIC published a guideline for **CYP2C9 and NSAIDs** (including ibuprofen) ~2020, elevating it to the highest tier |
+| **Mechanism** | Ibuprofen is primarily metabolized by CYP2C9; *2 and *3 alleles reduce…</pre></div>
+<div class="example"><div class="arm-tag">A1 — naïve RAG</div><pre>## Ibuprofen × CYP2C9: Evidence Level
+
+The retrieved context does **not** contain a PharmGKB clinical annotation specifically linking **ibuprofen** to **CYP2C9**. I cannot report an evidence level for that pairing without fabricating it.
+
+What the context *does* show:
+
+| Association | Evidence | PMIDs |
+|---|---|---|
+| Ibuprofen × **CYP2C8** \*1/\*2/\*4 (haplotypes) | Relationship only (no level stated) | [PMID:18694831], [PMID:33205280], [PMID:33812699] |
+| **Flurbiprofen** × CYP2C9\*1/\*2/\*3/\*29 | **1A** (Metabolism/PK) | — |
+
+CYP2C8 (not CYP2C9) is the primary enzyme linked to ibuprofen m…</pre></div>
+<div class="example"><div class="arm-tag">A2 — full subgraph</div><pre>The supplied context does not contain any information about **ibuprofen** or **CYP2C9**. The visible graph is an anesthesia-focused subgraph covering volatile anesthetics, succinylcholine, and genes relevant to Malignant Hyperthermia (primarily RYR1, CACNA1S, BCHE, etc.). Neither ibuprofen nor CYP2C9 appear as nodes or in any relationship.
+
+I cannot answer this question from the provided context without risking fabrication. To get the PharmGKB evidence level for the ibuprofen × CYP2C9 association, please consult [PharmGKB directly](https://www.pharmgkb.org) or expand the knowledge graph to inc…</pre></div>
+<div class="example"><div class="arm-tag">A3 — GraphRAG</div><pre>## Ibuprofen × CYP2C9: No Direct Association Found
+
+The supplied context does **not** contain a direct edge between ibuprofen and CYP2C9. Ibuprofen&#x27;s only direct pharmacogene link in the graph is:
+
+&gt; **ibuprofen → CYP2C8** [L3, Dosage/Metabolism/PK/Efficacy]
+
+The only path connecting ibuprofen to CYP2C9 is an indirect **3-hop chain** at L3:
+
+&gt; ibuprofen → CYP2C8 → Drug Toxicity → CYP2C9
+
+This is an associative traversal through an intermediate node, **not** a PharmGKB clinical guideline annotation for the ibuprofen/CYP2C9 pair itself.
+
+**Bottom line:** PharmGKB does not appear to have a clinic…</pre></div>
+</div>
+<h3>S3 · S3-001</h3>
+<p class="muted"><strong>Q:</strong> A patient is found to carry the rs2108622 variant in CYP4F2. Which class of medications may require dose adjustment, and why?</p>
+<p class="muted"><strong>Gold:</strong> {&quot;entities&quot;: [&quot;rs2108622&quot;, &quot;CYP4F2&quot;, &quot;Vitamin K Antagonists&quot;, &quot;warfarin&quot;], &quot;drug_class&quot;: &quot;Vitamin K Antagonists&quot;, &quot;should_refuse&quot;: false, &quot;answer_summary&quot;: &quot;Vitamin K Antagonists may require dose adjustment because of the CYP4F2 variant.&quot;}</p>
+<div class='examples'>
+<div class="example"><div class="arm-tag">A0 — no context</div><pre>## CYP4F2 rs2108622 (*3 allele) — Clinical Summary
+
+**Drug class affected: Vitamin K antagonists (VKAs), primarily warfarin.**
+
+### Mechanism
+
+CYP4F2 hydroxylates and clears hepatic vitamin K₁ (phylloquinone). The rs2108622 variant (c.1297G&gt;A; p.Val433Met) encodes the **CYP4F2\*3** allele, which has **reduced enzymatic activity**. As a result:
+
+- Less vitamin K is catabolized → **higher intrahepatic vitamin K stores**
+- More vitamin K is available to drive γ-carboxylation of clotting factors
+- The vitamin K cycle is therefore less easily suppressed by warfarin
+
+### Dosing implication
+
+*\*3* al…</pre></div>
+<div class="example"><div class="arm-tag">A1 — naïve RAG</div><pre>## CYP4F2 rs2108622 — Dose Adjustment Implications
+
+**Class affected: Vitamin K Antagonists (VKAs)**
+
+The retrieved evidence directly links **rs2108622** in **CYP4F2** to **dosage** considerations for **acenocoumarol** (a VKA anticoagulant), at **evidence level 2A** [3].
+
+### Why dose adjustment is needed
+
+CYP4F2 is a key enzyme in hepatic vitamin K catabolism. The rs2108622 (V433M) variant **reduces CYP4F2 activity**, leading to:
+
+1. **Lower vitamin K breakdown** → elevated hepatic vitamin K levels
+2. **Greater competition** with VKAs for their target (VKORC1)
+3. Net result: **higher VKA dose…</pre></div>
+<div class="example"><div class="arm-tag">A2 — full subgraph</div><pre>## CYP4F2 rs2108622 — Outside the Current Graph Context
+
+**The supplied context does not include CYP4F2 or the rs2108622 variant.** The visible subgraph is scoped to an anesthesia pharmacogenomics seed (RYR1, CACNA1S, BCHE, ABCB1, CYP2E1, and related anesthetic drugs). CYP4F2 is not among the 13 genes currently loaded.
+
+---
+
+**What the graph cannot tell you here:** Any claim about rs2108622 and dose adjustment would draw solely on my training data — not on graph-grounded evidence — which would violate the grounding rule for this assistant.
+
+**For reference (training knowledge, not graph-source…</pre></div>
+<div class="example"><div class="arm-tag">A3 — GraphRAG</div><pre>## CYP4F2 rs2108622 — Vitamin K Antagonists Require Dose Adjustment
+
+**Primary drug class: Vitamin K Antagonists (VKAs)**
+
+The graph provides direct dosage-level evidence:
+
+| Drug | Evidence | Type |
+|------|----------|------|
+| Acenocoumarol | **L2A** (CRITICAL) | Dosage |
+| Warfarin | L3 | Efficacy / Dosage |
+| Phenprocoumon | L3 | Dosage |
+
+**Why dose adjustment is needed:**
+
+CYP4F2 is the primary enzyme responsible for metabolizing **vitamin K1 (phylloquinone)**. The rs2108622 variant (*3 allele, V433M) reduces CYP4F2 enzymatic activity → less vitamin K1 catabolism → **elevated intracellul…</pre></div>
+</div>
+<h3>S4 · S4-001</h3>
+<p class="muted"><strong>Q:</strong> Cite a primary research reference (PMID) supporting the flucloxacillin × HLA-B pharmacogenomic association.</p>
+<p class="muted"><strong>Gold:</strong> {&quot;entities&quot;: [&quot;flucloxacillin&quot;, &quot;HLA-B&quot;], &quot;pmids&quot;: [&quot;19483685&quot;, &quot;30661239&quot;, &quot;30664875&quot;], &quot;should_refuse&quot;: false, &quot;answer_summary&quot;: &quot;Any PMID from the curated list supporting flucloxacillin \u00d7 HLA-B.&quot;}</p>
+<div class='examples'>
+<div class="example"><div class="arm-tag">A0 — no context</div><pre>## Flucloxacillin × HLA-B*57:01
+
+&gt; ⚠️ No graph context was retrieved for this query. The citation below comes from general pharmacogenomic knowledge — please verify against the knowledge graph if a graph-grounded answer is required.
+
+The landmark primary reference is:
+
+**Daly AK et al. (2009).** &quot;HLA-B\*5701 genotype is a major determinant of drug-induced liver injury due to flucloxacillin.&quot; *Nature Genetics* 41(7):816–819.
+**[PMID:19483685]**
+
+This genome-wide association study (GWAS) identified **HLA-B\*57:01** as strongly associated with flucloxacillin-induced cholestatic hepatitis (OR ~80-…</pre></div>
+<div class="example"><div class="arm-tag">A1 — naïve RAG</div><pre>## Flucloxacillin × HLA-B: Primary Reference
+
+The retrieved evidence directly supports this association:
+
+**HLA-B\*57:03** is linked to flucloxacillin, with the supporting primary reference:
+
+&gt; [PMID:30661239]
+
+This PMID (30661239) underpins the PharmGKB-curated relationship between the **HLA-B\*57:03** haplotype and flucloxacillin — the same study also supports associations with HLA-DQA1\*02:01, HLA-DQA1 (gene-level), HLA-DQB1, and HLA-DQB1\*03:03 [PMID:30661239].
+
+A second study [PMID:30664875] corroborates related HLA associations (HLA-C\*06:02, HLA-DQB1, HLA-DQB1\*03:03, HLA-DQB1\*06:02) w…</pre></div>
+<div class="example"><div class="arm-tag">A2 — full subgraph</div><pre>The supplied graph context does not contain any information about **flucloxacillin** or **HLA-B** — both are absent from this anesthesia-focused subgraph (which covers volatile anesthetics, succinylcholine, RYR1, CACNA1S, and related genes).
+
+I cannot cite a PMID for that association from the available context, and I won&#x27;t fabricate one.
+
+**What to do instead:** The flucloxacillin × HLA-B*57:01 (drug-induced liver injury) association is catalogued in PharmGKB and CPIC. Query those databases directly, or ask me again once the relevant nodes (flucloxacillin, HLA-B) have been loaded into the know…</pre></div>
+<div class="example"><div class="arm-tag">A3 — GraphRAG</div><pre>## Flucloxacillin × HLA-B — Not Supported by the Supplied Context
+
+The knowledge graph does **not** contain a direct edge between flucloxacillin and HLA-B, and **no PMID is provided** for this association in the retrieved context.
+
+The only flucloxacillin edge in the graph is:
+
+&gt; `flucloxacillin --affects response to [L3, Toxicity]--&gt; NR1I2`
+
+The &quot;shortest path&quot; surfaced is a **3-hop indirect route** (flucloxacillin → NR1I2 → carbamazepine → HLA-B), which does not represent a genuine flucloxacillin × HLA-B pharmacogenomic relationship.
+
+---
+
+**What this means:** The graph does not currently mo…</pre></div>
+</div>
+<h3>S6 · S6-001</h3>
+<p class="muted"><strong>Q:</strong> According to PharmGKB-curated evidence, is there a clinically meaningful pharmacogenomic association between divalproex sodium and CYP2D6?</p>
+<p class="muted"><strong>Gold:</strong> {&quot;entities&quot;: [&quot;divalproex sodium&quot;, &quot;CYP2D6&quot;], &quot;should_refuse&quot;: false, &quot;expected_negative&quot;: true, &quot;answer_summary&quot;: &quot;No, PharmGKB lists this pair as not associated / ambiguous.&quot;}</p>
+<div class='examples'>
+<div class="example"><div class="arm-tag">A0 — no context</div><pre>## Divalproex Sodium × CYP2D6: PharmGKB Evidence
+
+**No retrieved knowledge-graph context was provided for this query**, so I am drawing on general pharmacogenomic knowledge — please verify against the live PharmGKB database.
+
+### Short answer: No clinically meaningful association is expected.
+
+CYP2D6 is **not** a primary metabolic pathway for valproic acid (the active moiety of divalproex sodium). Valproate&#x27;s major metabolic routes are:
+
+| Pathway | Enzymes |
+|---|---|
+| Glucuronidation (dominant) | UGT1A4, UGT1A6, UGT2B7 |
+| β-oxidation | Mitochondrial (POLG-relevant) |
+| Minor CYP oxidation …</pre></div>
+<div class="example"><div class="arm-tag">A1 — naïve RAG</div><pre>## Divalproex Sodium ↔ CYP2D6: PharmGKB Evidence
+
+**The retrieved context does not support this association.**
+
+None of the 8 PharmGKB-curated relationships returned mention divalproex sodium (or its active form, valproic acid) in connection with CYP2D6. The CYP2D6 associations present in the retrieved evidence involve:
+
+- Ketorolac [PMID:17986163]
+- Tolperisone [PMID:25953735, 37728834]
+- Bepridil [PMID:16508157]
+- R-EDDP [PMID:40080971]
+- Head and Neck Neoplasms [PMID:33131142]
+
+**What is known from general pharmacology** (outside this retrieval): Valproic acid is primarily metabolized via U…</pre></div>
+<div class="example"><div class="arm-tag">A2 — full subgraph</div><pre>## Divalproex Sodium × CYP2D6: Not Supported by the Available Context
+
+The supplied graph is an **anesthesia seed subgraph** and contains neither **divalproex sodium** nor **CYP2D6**. The drugs present are volatile anesthetics (sevoflurane, isoflurane, desflurane, halothane, enflurane, methoxyflurane) and succinylcholine; the genes are anesthesia-relevant (RYR1, CACNA1S, BCHE, ABCB1, CYP2E1, etc.).
+
+Because divalproex sodium and CYP2D6 fall **outside this subgraph**, I cannot make any claim about their association grounded in the provided context. To answer this question accurately, the graph …</pre></div>
+<div class="example"><div class="arm-tag">A3 — GraphRAG</div><pre>## No Evidence Found in This Knowledge Graph
+
+Based on the PharmGKB-curated context provided, **divalproex sodium does not appear anywhere** in the neighbourhood of CYP2D6 (or CYP2A6/CYP2B6). There is no direct or indirect edge connecting divalproex sodium to CYP2D6 in the retrieved subgraph.
+
+### What the graph *does* show for CYP2D6:
+The CYP2D6 neighbourhood is densely populated with well-evidenced associations — notably:
+- Opioids (codeine, hydrocodone, tramadol) — **CRITICAL, L1A**
+- Tricyclic antidepressants (desipramine, nortriptyline, clomipramine, imipramine) — **CRITICAL, L1A**
+- Anti…</pre></div>
+</div>
+<h3>S7 · S7-001</h3>
+<p class="muted"><strong>Q:</strong> What pharmacogenomic guidelines exist for coenzyme Q10 in PharmGKB? Cite the specific gene-drug interactions if any.</p>
+<p class="muted"><strong>Gold:</strong> {&quot;entities&quot;: [&quot;coenzyme Q10&quot;], &quot;should_refuse&quot;: true, &quot;answer_summary&quot;: &quot;coenzyme Q10 is not in PharmGKB&#x27;s clinical guidelines; appropriate response is to indicate no pharmacogenomic guidelines exist.&quot;}</p>
+<div class='examples'>
+<div class="example"><div class="arm-tag">A0 — no context</div><pre>## CoQ10 Pharmacogenomics in PharmGKB
+
+**No retrieved context was provided for this query**, so I&#x27;m drawing on general knowledge — and importantly, there are meaningful limitations here.
+
+### What PharmGKB actually covers for CoQ10
+
+To my knowledge, **PharmGKB does not have any CPIC-level (1A or 1B) clinical pharmacogenomic guidelines for coenzyme Q10** as a therapeutic agent. CoQ10 is primarily classified as an endogenous compound/dietary supplement, which limits its profile in curated PGx databases.
+
+### Relevant adjacencies (what *is* documented)
+
+| Context | Gene(s) | Relationship |
+|---|-…</pre></div>
+<div class="example"><div class="arm-tag">A1 — naïve RAG</div><pre>## Coenzyme Q10 in PharmGKB — Query Result
+
+**The retrieved context does not contain any pharmacogenomic guidelines or gene-drug interactions for coenzyme Q10 (CoQ10).**
+
+None of the 8 retrieved evidence nodes mention CoQ10, ubiquinone, or related terms. The top results cover unrelated relationships (e.g., *OPRM1* / nicotine dependence [PMID:15007373], enzyme inhibitors / *CYP19A1* [PMID:19512956]).
+
+### What this likely means
+
+- PharmGKB&#x27;s curated guideline set (CPIC, DPWG, etc.) does **not** currently include a CoQ10 clinical guideline — CoQ10 is a supplement rather than a regulated drug, so…</pre></div>
+<div class="example"><div class="arm-tag">A2 — full subgraph</div><pre>## Coenzyme Q10 — Not in the Supplied Context
+
+The visible graph does not contain **coenzyme Q10** (ubiquinone/CoQ10) as a drug node, nor are there any gene-drug relationships, variant clusters, or PharmGKB guidelines for it in the current subgraph.
+
+The drugs present in this knowledge graph are limited to **anesthetic agents**:
+- Volatile anesthetics: isoflurane, desflurane, sevoflurane, enflurane, halothane, methoxyflurane
+- Depolarizing neuromuscular blocker: succinylcholine
+
+I cannot fabricate PharmGKB annotations for CoQ10 that are not grounded in the supplied context. To get accurate Pha…</pre></div>
+<div class="example"><div class="arm-tag">A3 — GraphRAG</div><pre>## Pharmacogenomic Data for Coenzyme Q10 / COQ2 in PharmGKB
+
+Based on the knowledge graph context, **no formal PharmGKB clinical guidelines (e.g., CPIC or DPWG)** exist for coenzyme Q10 itself. However, there are relevant **Level 3 gene-drug interaction annotations** involving the *COQ2* gene:
+
+### Gene-Drug Interactions (Level 3 — Toxicity)
+
+| Drug | Relationship | Gene | Phenotype |
+|------|-------------|------|-----------|
+| Atorvastatin | affects response to | *COQ2* | Toxicity |
+| Rosuvastatin | affects response to | *COQ2* | Toxicity |
+| HMG-CoA reductase inhibitors (class) | affects res…</pre></div>
+</div><h2>Deviations & threats (read the numbers with these in mind)</h2><ul>
+      <li><strong>Generator was Sonnet, not Opus.</strong> Pre-registration named Opus; we used Sonnet
+        for cost/throughput (~10× cheaper). A stronger generator might change A0's parametric quality.</li>
+      <li><strong>Judge was Claude Haiku judging Claude Sonnet</strong> (within-family). Self-preference
+        bias is only partially mitigated; cross-family (Gemini) judging would be stronger.</li>
+      <li><strong>relationships.tsv leakage.</strong> Only clinicalVariants rows were held out;
+        relationships.tsv (which restates many associations + PMIDs) was not. This gave A1 access to
+        nominally held-out facts — the S4 result is confounded by this.</li>
+      <li><strong>A1 steelman omitted the BGE reranker</strong> (BM25 + dense + RRF only) to keep the
+        laptop install light. A reranker would likely make A1 even stronger, not weaker — so A3's
+        non-advantage is, if anything, understated.</li>
+      <li><strong>Refusal/negative metrics are keyword-heuristic</strong> and noisy; treat S6/S7
+        rule-based numbers as directional.</li>
+      <li><strong>Single model, single judge, n≈25–40 per stratum.</strong> Per-stratum numbers are
+        descriptive, not inferential. Only the n=187 pairwise test is adequately powered.</li>
+    </ul><footer>Generated from 748 scores and 374 judgments. Generator: Claude Sonnet 4 · Judge: Claude Haiku 4.5. Methodology: <code>~/.claude/plans/elegant-skipping-quiche.md</code>. Pre-registration: <code>eval/preregistration.md</code>.</footer></div></body></html>

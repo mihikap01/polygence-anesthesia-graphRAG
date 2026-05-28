@@ -30,9 +30,7 @@ firebase-debug.log
 # Unrelated project
 silent-spaces/
 
-# Eval intermediates — regenerable from scripts
-eval/answers.jsonl
-eval/scores.jsonl
-eval/segments.jsonl
-eval/report.html
+# Eval — keep results + raw evidence committed; ignore only heavy/derived caches
 eval/.cache/
+eval/__pycache__/
+eval/segments.jsonl
