@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Polygence GraphRAG — code architecture</title>
+<title>Polygence GraphRAG — reproduction guide</title>
 <meta name="author" content="Mihika Pall">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -30,25 +30,30 @@
     font-family: Inter, system-ui, -apple-system, sans-serif;
     line-height: 1.6; font-size: 15px;
   }
-  .wrap { max-width: 1040px; margin: 0 auto; padding: 48px 24px 64px; }
-  .header { padding: 0 0 32px; border-bottom: 1px solid var(--border); margin-bottom: 36px; }
-  .venue { font-size: 11px; text-transform: uppercase; letter-spacing: .12em; color: var(--muted); margin-bottom: 14px; }
+  .wrap { max-width: 920px; margin: 0 auto; padding: 48px 24px 64px; }
+  .header { padding: 0 0 28px; border-bottom: 1px solid var(--border); margin-bottom: 36px; }
+  .venue { font-size: 11px; text-transform: uppercase; letter-spacing: .12em; color: var(--muted); margin-bottom: 12px; }
   h1 { font-size: 30px; font-weight: 600; letter-spacing: -.02em; margin: 0 0 8px; line-height: 1.2; }
   .byline { font-size: 14px; color: var(--muted); }
   .byline strong { color: var(--fg); }
   h2 {
-    font-size: 20px; margin: 48px 0 14px; font-weight: 600;
-    letter-spacing: -.01em; padding-bottom: 6px; border-bottom: 2px solid var(--primary-bg);
+    font-size: 22px; margin: 56px 0 16px; font-weight: 600;
+    letter-spacing: -.01em; padding-bottom: 8px; border-bottom: 2px solid var(--primary-bg);
   }
-  h3 { font-size: 16px; margin: 28px 0 8px; font-weight: 600; }
+  h3 { font-size: 15px; margin: 24px 0 8px; font-weight: 600; }
   .muted { color: var(--muted); }
   code, pre { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 13px; }
   code { background: var(--primary-bg); padding: 1px 6px; border-radius: 5px; color: var(--fg); }
-  pre {
-    background: var(--card); border: 1px solid var(--border); border-radius: 12px;
-    padding: 16px; overflow-x: auto; box-shadow: var(--soft);
-    font-size: 12.5px; line-height: 1.5; margin: 14px 0;
-    white-space: pre; color: var(--fg);
+  pre.cmd {
+    background: hsl(215 20% 18%); color: hsl(195 50% 94%);
+    border-radius: 10px; padding: 12px 16px; overflow-x: auto;
+    font-size: 13px; line-height: 1.55; margin: 10px 0;
+    white-space: pre; box-shadow: var(--soft);
+  }
+  pre.out {
+    background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+    padding: 12px 16px; overflow-x: auto; font-size: 12.5px; line-height: 1.55;
+    color: var(--muted); margin: 8px 0;
   }
   .lede {
     background: linear-gradient(135deg, hsl(195 50% 94%), hsl(150 40% 95%));
@@ -66,28 +71,14 @@
   th, td { padding: 9px 14px; text-align: left; border-bottom: 1px solid var(--border); vertical-align: top; }
   th { background: var(--primary-bg); font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); font-weight: 600; }
   tr:last-child td { border-bottom: none; }
-  .pill {
-    display: inline-block; padding: 2px 10px; border-radius: 999px;
-    font-size: 11px; font-weight: 500;
-    background: var(--primary-bg); color: var(--primary);
-    margin-right: 6px; margin-bottom: 4px;
-  }
-  .pill-warn { background: var(--accent-bg); color: var(--accent); }
-  .pill-good { background: var(--secondary-bg); color: var(--secondary); }
-  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 14px 0; }
-  .card {
-    background: var(--card); border: 1px solid var(--border); border-radius: 14px;
-    padding: 16px 18px; box-shadow: var(--soft);
-  }
-  .card h4 { margin: 0 0 6px; font-size: 14px; font-weight: 600; }
-  .card p { margin: 4px 0; font-size: 13.5px; color: var(--muted); }
-  .card .meta { font-size: 11px; color: var(--muted); margin-top: 6px; font-family: 'JetBrains Mono', monospace; }
+  td.right, th.right { text-align: right; }
   .toc {
     background: var(--card); border: 1px solid var(--border); border-radius: 12px;
     padding: 14px 20px; box-shadow: var(--soft); margin: 0 0 28px;
   }
   .toc h4 { margin: 0 0 8px; font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 700; }
-  .toc ol { margin: 0; padding-left: 22px; font-size: 14px; column-count: 2; column-gap: 24px; }
+  .toc ol { margin: 0; padding-left: 22px; font-size: 14px; }
+  .toc li { margin: 3px 0; }
   .toc a { color: var(--primary); text-decoration: none; }
   .toc a:hover { text-decoration: underline; }
   .nav-links { display: flex; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
@@ -99,591 +90,495 @@
     transition: all 0.15s;
   }
   .nav-links a:hover { color: var(--primary); border-color: var(--primary); }
+
+  /* Step card */
+  .step {
+    background: var(--card); border: 1px solid var(--border); border-radius: 14px;
+    padding: 20px 24px; margin: 16px 0; box-shadow: var(--soft);
+    display: grid; grid-template-columns: 48px 1fr; gap: 18px;
+  }
+  .step-num {
+    grid-row: 1 / -1;
+    width: 38px; height: 38px; border-radius: 50%;
+    background: var(--primary); color: #fff;
+    font-weight: 700; font-size: 15px;
+    display: flex; align-items: center; justify-content: center;
+    margin-top: 2px;
+  }
+  .step-body { min-width: 0; }
+  .step-head {
+    display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;
+    margin-bottom: 4px;
+  }
+  .step-title { font-size: 17px; font-weight: 600; color: var(--fg); margin: 0; }
+  .step-meta { display: inline-flex; gap: 6px; flex-wrap: wrap; }
+  .pill {
+    display: inline-block; padding: 2px 9px; border-radius: 999px;
+    font-size: 11px; font-weight: 500;
+  }
+  .pill-time { background: var(--primary-bg); color: var(--primary); }
+  .pill-cost { background: var(--secondary-bg); color: var(--secondary); }
+  .pill-warn { background: var(--accent-bg); color: var(--accent); }
+  .pill-opt  { background: hsl(265 35% 95%); color: hsl(265 30% 50%); }
+  .step-what { font-size: 14px; color: var(--muted); margin: 6px 0 4px; }
+  .step-section-label {
+    font-size: 11px; text-transform: uppercase; letter-spacing: .07em;
+    color: var(--muted); margin-top: 14px; font-weight: 600;
+  }
+  .step-verify {
+    margin: 6px 0 0; padding: 10px 14px;
+    background: hsl(150 40% 96%); border-left: 3px solid hsl(150 35% 50%);
+    border-radius: 0 8px 8px 0; font-size: 13px; color: var(--fg);
+  }
+
+  /* Group header (for the 8-step eval section) */
+  .group-banner {
+    background: var(--primary-bg); border: 1px solid hsl(195 35% 70%);
+    border-radius: 14px; padding: 14px 20px; margin: 18px 0 6px;
+    font-size: 14px; color: var(--fg);
+  }
+  .group-banner strong { color: var(--primary); }
+
   footer {
     color: var(--muted); font-size: 12px; margin-top: 64px;
     padding-top: 24px; border-top: 1px solid var(--border);
     text-align: center;
   }
-  .diagram {
-    background: var(--card); border: 1px solid var(--border); border-radius: 14px;
-    padding: 28px 24px; margin: 18px 0; box-shadow: var(--soft);
-    overflow-x: auto;
+  .file-tree {
+    background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+    padding: 14px 18px; font-family: 'JetBrains Mono', monospace; font-size: 12px;
+    overflow-x: auto; white-space: pre; line-height: 1.5; color: var(--fg);
+    box-shadow: var(--soft); margin: 12px 0;
   }
-  .diagram pre { background: transparent; border: none; box-shadow: none; padding: 0; margin: 0; font-size: 12.5px; color: var(--fg); }
-
-  /* SVG diagram styling (replaces ASCII-art with proper boxes + arrows) */
-  .svg-diagram { width: 100%; height: auto; display: block; margin: 0 auto; }
-  .svg-source-fill   { fill: hsl(40 70% 96%); }
-  .svg-source-stroke { stroke: hsl(40 60% 55%); stroke-width: 1.5; }
-  .svg-code-fill     { fill: hsl(195 50% 96%); }
-  .svg-code-stroke   { stroke: hsl(195 35% 45%); stroke-width: 1.5; }
-  .svg-data-fill     { fill: hsl(265 35% 96%); }
-  .svg-data-stroke   { stroke: hsl(265 30% 58%); stroke-width: 1.5; }
-  .svg-app-fill      { fill: hsl(150 40% 95%); }
-  .svg-app-stroke    { stroke: hsl(150 35% 42%); stroke-width: 1.5; }
-  .svg-infra-fill    { fill: hsl(215 25% 95%); }
-  .svg-infra-stroke  { stroke: hsl(215 20% 50%); stroke-width: 1.5; }
-  .svg-accent-fill   { fill: hsl(10 60% 96%); }
-  .svg-accent-stroke { stroke: hsl(10 55% 55%); stroke-width: 1.5; }
-  .svg-title  { font: 600 13px Inter, sans-serif; fill: hsl(215 20% 18%); }
-  .svg-sub    { font: 400 11px Inter, sans-serif; fill: hsl(215 15% 35%); }
-  .svg-cap    { font: 400 10px Inter, sans-serif; fill: hsl(215 15% 45%); }
-  .svg-step-num { font: 700 12px Inter, sans-serif; fill: #fff; }
-  .svg-line   { stroke: hsl(215 15% 45%); stroke-width: 1.8; fill: none; }
-  .svg-line-dashed { stroke: hsl(215 15% 55%); stroke-width: 1.2; fill: none; stroke-dasharray: 4 3; }
-  .svg-bus    { stroke: hsl(215 15% 60%); stroke-width: 1.5; fill: none; }
-  /* Drop-shadow filter applied via filter attr on rects */
-
-  .legend { display:flex; flex-wrap:wrap; gap:14px; margin: 6px 0 18px; font-size: 12px; color: var(--muted); }
-  .legend-item { display:inline-flex; align-items:center; gap:6px; }
-  .legend-swatch { width:14px; height:10px; border-radius:3px; display:inline-block; }
-
-  @media (max-width: 700px) { .grid-2 { grid-template-columns: 1fr; } .toc ol { column-count: 1; } }
+  .file-tree .dim { color: var(--muted); }
+  @media (max-width: 700px) {
+    .step { grid-template-columns: 1fr; }
+    .step-num { grid-row: auto; }
+  }
 </style>
 </head>
 <body>
 <div class="wrap">
 
 <div class="header">
-  <div class="venue">Polygence pharmacogenomic graph-RAG · code architecture</div>
-  <h1>How the system is built</h1>
-  <p class="byline">Author: <strong>Mihika Pall</strong>. A walkthrough of the codebase — what each module does, how the pieces connect, and how the live demo and evaluation framework relate.</p>
+  <div class="venue">Polygence pharmacogenomic graph-RAG · reproduction guide</div>
+  <h1>How to reproduce every result in this project, step by step</h1>
+  <p class="byline">Author: <strong>Mihika Pall</strong> · Polygence (2026). Run-along instructions for someone reading the codebase for the first time — every command, every expected output, every cost and time estimate.</p>
   <div class="nav-links">
     <a href="https://polygence-pubmed-graphrag.web.app">Live demo →</a>
     <a href="/eval-report">Eval report →</a>
-    <a href="https://github.com/mihikap01/polygence-anesthesia-graphRAG">GitHub →</a>
+    <a href="https://github.com/mihikap01/polygence-anesthesia-graphRAG">GitHub repo →</a>
   </div>
 </div>
 
 <div class="lede">
-  <p>The project ships <strong>two parallel surfaces over the same PharmGKB pharmacogenomic knowledge graph</strong>:</p>
-  <p>(1) <strong>An interactive web app</strong> — a Cytoscape-rendered graph with Explain (click a node/edge) and Chat (free-form question) panels. Both panels do GraphRAG retrieval and feed the result to an LLM (Claude CLI locally, Gemini via Firebase Cloud Function in production).</p>
-  <p>(2) <strong>A reproducible evaluation framework</strong> — 187 held-out questions × 3 retrieval conditions (no-context, plain-text RAG, subgraph RAG) × 4 metric families (rule-based, pairwise preference, rubric, hallucination via merged-claim segmentation). All scripts and raw evidence committed.</p>
+  <p>If you run every step below in order, by the end you will have:</p>
+  <p>(1) The <strong>knowledge graph</strong> built from PharmGKB (3,213 nodes, 8,024 edges).</p>
+  <p>(2) The <strong>interactive web app</strong> running locally at <code>http://localhost:3000</code>, with the Cytoscape graph canvas and the Explain / Chat panels powered by your local Claude CLI.</p>
+  <p>(3) The <strong>full evaluation</strong> rerun from scratch: 187 held-out questions, three retrieval conditions, four metric families, the same <code>eval/report.html</code> that's published at <a href="/eval-report">/eval-report</a>.</p>
+  <p>Total wall time: ~5 hours (most of it the LLM generation in step 8). Total cost: ~$45 in Claude API spend. Skip the eval if you only want the demo: ~5 minutes.</p>
 </div>
 
 <div class="toc">
-  <h4>Contents</h4>
+  <h4>Steps</h4>
   <ol>
-    <li><a href="#sys">1. System overview</a></li>
-    <li><a href="#pipe">2. Data pipeline</a></li>
-    <li><a href="#web">3. Web app architecture</a></li>
-    <li><a href="#deploy">4. Two deploy targets</a></li>
-    <li><a href="#eval">5. Eval framework</a></li>
-    <li><a href="#flow">6. End-to-end flow for one question</a></li>
-    <li><a href="#tree">7. File tree</a></li>
-    <li><a href="#stack">8. Tech stack</a></li>
+    <li><a href="#s1">Prerequisites</a> — what you need installed</li>
+    <li><a href="#s2">Clone &amp; install dependencies</a></li>
+    <li><a href="#s3">Build the PharmGKB knowledge graph</a></li>
+    <li><a href="#s4">Run the web app locally</a></li>
+    <li><a href="#s5">(Optional) Deploy to Firebase Hosting</a></li>
+    <li><a href="#s6">Reproduce the evaluation — setup</a></li>
+    <li><a href="#s7">Reproduce the evaluation — generation</a></li>
+    <li><a href="#s8">Reproduce the evaluation — scoring</a></li>
+    <li><a href="#s9">Generate the final report</a></li>
+    <li><a href="#s10">What you'll have at the end</a></li>
   </ol>
 </div>
 
-<h2 id="sys">1. System overview</h2>
-
-<div class="legend">
-  <span class="legend-item"><span class="legend-swatch" style="background:hsl(40 70% 88%);border:1.5px solid hsl(40 60% 55%);"></span> Source data</span>
-  <span class="legend-item"><span class="legend-swatch" style="background:hsl(195 50% 90%);border:1.5px solid hsl(195 35% 45%);"></span> Code / scripts</span>
-  <span class="legend-item"><span class="legend-swatch" style="background:hsl(265 35% 90%);border:1.5px solid hsl(265 30% 58%);"></span> Generated artifacts</span>
-  <span class="legend-item"><span class="legend-swatch" style="background:hsl(150 40% 88%);border:1.5px solid hsl(150 35% 42%);"></span> Consumer applications</span>
-  <span class="legend-item"><span class="legend-swatch" style="background:hsl(215 25% 90%);border:1.5px solid hsl(215 20% 50%);"></span> Infrastructure</span>
-</div>
-
-<div class="diagram">
-<svg viewBox="0 0 900 510" class="svg-diagram" xmlns="http://www.w3.org/2000/svg">
-  <defs>
-    <filter id="dropshadow" x="-20%" y="-20%" width="140%" height="140%">
-      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-opacity="0.10"/>
-    </filter>
-    <marker id="arrowhead" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
-      <path d="M0,0 L10,5 L0,10 z" fill="hsl(215 15% 45%)"/>
-    </marker>
-  </defs>
-
-  <!-- Layer 1: Source TSVs -->
-  <rect class="svg-source-fill svg-source-stroke" x="80" y="15" width="740" height="80" rx="14" filter="url(#dropshadow)"/>
-  <text class="svg-title" x="450" y="42" text-anchor="middle">PharmGKB source data</text>
-  <text class="svg-sub" x="450" y="62" text-anchor="middle">clinicalVariants.tsv · relationships.tsv · drugs.tsv · genes.tsv · phenotypes.tsv · chemicals.tsv</text>
-  <text class="svg-cap" x="450" y="80" text-anchor="middle">6 files · ~160k rows total · curated, evidence-graded</text>
-
-  <!-- Arrow down -->
-  <line class="svg-line" x1="450" y1="95" x2="450" y2="120" marker-end="url(#arrowhead)"/>
-
-  <!-- Layer 2: Build script -->
-  <rect class="svg-code-fill svg-code-stroke" x="290" y="125" width="320" height="80" rx="14" filter="url(#dropshadow)"/>
-  <text class="svg-title" x="450" y="152" text-anchor="middle">preprocess/build_graph.py</text>
-  <text class="svg-sub" x="450" y="172" text-anchor="middle">Python 3 stdlib only · ~500 lines</text>
-  <text class="svg-cap" x="450" y="190" text-anchor="middle">parse · normalise IDs · collapse rsIDs · inject drug-class</text>
-
-  <!-- Bus down + fan-out to 3 artifacts -->
-  <line class="svg-line" x1="450" y1="205" x2="450" y2="220"/>
-  <line class="svg-bus" x1="200" y1="220" x2="700" y2="220"/>
-  <line class="svg-line" x1="200" y1="220" x2="200" y2="240" marker-end="url(#arrowhead)"/>
-  <line class="svg-line" x1="450" y1="220" x2="450" y2="240" marker-end="url(#arrowhead)"/>
-  <line class="svg-line" x1="700" y1="220" x2="700" y2="240" marker-end="url(#arrowhead)"/>
-
-  <!-- Layer 3: Generated artifacts -->
-  <rect class="svg-data-fill svg-data-stroke" x="80" y="245" width="240" height="72" rx="12" filter="url(#dropshadow)"/>
-  <text class="svg-title" x="200" y="270" text-anchor="middle">data/graph.json</text>
-  <text class="svg-sub" x="200" y="288" text-anchor="middle">3,213 nodes · 8,024 edges</text>
-  <text class="svg-cap" x="200" y="304" text-anchor="middle">~2 MB</text>
-
-  <rect class="svg-data-fill svg-data-stroke" x="330" y="245" width="240" height="72" rx="12" filter="url(#dropshadow)"/>
-  <text class="svg-title" x="450" y="270" text-anchor="middle">data/seed_anesthesia.json</text>
-  <text class="svg-sub" x="450" y="288" text-anchor="middle">36 nodes (MH demo subgraph)</text>
-  <text class="svg-cap" x="450" y="304" text-anchor="middle">~28 KB</text>
-
-  <rect class="svg-data-fill svg-data-stroke" x="580" y="245" width="240" height="72" rx="12" filter="url(#dropshadow)"/>
-  <text class="svg-title" x="700" y="270" text-anchor="middle">data/search_index.json</text>
-  <text class="svg-sub" x="700" y="288" text-anchor="middle">Flat entity index</text>
-  <text class="svg-cap" x="700" y="304" text-anchor="middle">~302 KB</text>
-
-  <!-- Bus down + branches to two consumers -->
-  <line class="svg-line" x1="200" y1="317" x2="200" y2="335"/>
-  <line class="svg-line" x1="450" y1="317" x2="450" y2="335"/>
-  <line class="svg-line" x1="700" y1="317" x2="700" y2="335"/>
-  <line class="svg-bus" x1="200" y1="335" x2="700" y2="335"/>
-  <line class="svg-line" x1="290" y1="335" x2="290" y2="358" marker-end="url(#arrowhead)"/>
-  <line class="svg-line" x1="650" y1="335" x2="650" y2="358" marker-end="url(#arrowhead)"/>
-
-  <!-- Layer 4: Consumers -->
-  <rect class="svg-app-fill svg-app-stroke" x="80" y="360" width="420" height="130" rx="14" filter="url(#dropshadow)"/>
-  <text class="svg-title" x="290" y="385" text-anchor="middle">Web app · Next.js 14</text>
-  <text class="svg-sub" x="290" y="406" text-anchor="middle">Cytoscape graph canvas · Explain &amp; Chat panels</text>
-  <text class="svg-sub" x="290" y="422" text-anchor="middle">Server API routes + static export</text>
-  <text class="svg-cap" x="290" y="448" text-anchor="middle">Local: claude-cli  ·  Deployed: Firebase Hosting</text>
-  <text class="svg-cap" x="290" y="465" text-anchor="middle">polygence-pubmed-graphrag.web.app</text>
-
-  <rect class="svg-app-fill svg-app-stroke" x="500" y="360" width="320" height="130" rx="14" filter="url(#dropshadow)"/>
-  <text class="svg-title" x="660" y="385" text-anchor="middle">Eval framework · Python</text>
-  <text class="svg-sub" x="660" y="406" text-anchor="middle">3 arms × 187 questions</text>
-  <text class="svg-sub" x="660" y="422" text-anchor="middle">4 independent metric families</text>
-  <text class="svg-cap" x="660" y="448" text-anchor="middle">All scripts deterministic, resumable</text>
-  <text class="svg-cap" x="660" y="465" text-anchor="middle">Report: /eval-report</text>
-</svg>
-</div>
-
-<h2 id="pipe">2. Data pipeline</h2>
-
-<p>One script (<code>preprocess/build_graph.py</code>, Python stdlib only) turns the six raw PharmGKB TSVs into three JSON artifacts under <code>data/</code>:</p>
-
-<table>
-  <thead><tr><th>File</th><th>Size</th><th>What's in it</th><th>Consumers</th></tr></thead>
-  <tbody>
-    <tr><td><code>graph.json</code></td><td>~2 MB</td><td>3,213 nodes (drug / gene / variant_cluster / drug_class / phenotype) + 8,024 typed edges with evidence levels, PMIDs, and CRITICAL flags</td><td>Web app graph canvas, Explain/Chat retrieval; eval A3 (subgraph RAG)</td></tr>
-    <tr><td><code>seed_anesthesia.json</code></td><td>~28 KB</td><td>The 36-node anesthesia / MH demo subgraph used as the default view</td><td>Web app initial load</td></tr>
-    <tr><td><code>search_index.json</code></td><td>~302 KB</td><td>Flat list of {id, label, type, alt} for entity-linking and autocomplete</td><td>LeftSidebar search, eval A3 entity-linker</td></tr>
-  </tbody>
-</table>
-
-<h3>Held-out variant of the pipeline (for eval fairness)</h3>
-<p>The same build script honours two env vars to produce a reduced graph for the evaluation:</p>
-<pre>HELDOUT_VARIANTS=eval/heldout_variant_hashes.txt \
-HELDOUT_OUTPUT=graph_heldout.json \
-python3 preprocess/build_graph.py
-# → data/graph_heldout.json (3,203 nodes, 7,972 edges)
-# → data/search_index_heldout.json (same shape, reduced)
-# → data/seed_anesthesia_heldout.json</pre>
-
-<h2 id="web">3. Web app architecture</h2>
-
-<p>Next.js 14 App Router. TypeScript throughout. Cytoscape for the graph canvas, Tailwind + small custom CSS for the rest. State held in a Zustand store. Two build targets: server (API routes active, Claude CLI) and static export (BYOK to the user's LLM key).</p>
-
-<div class="grid-2">
-  <div class="card">
-    <h4>Frontend modules</h4>
-    <p><code>app/page.tsx</code> — three-pane layout, loads seed graph on mount.</p>
-    <p><code>app/about/page.tsx</code> — about + author + links.</p>
-    <p><code>components/GraphCanvas.tsx</code> — Cytoscape (fcose layout), click handlers, filter classes.</p>
-    <p><code>components/LeftSidebar.tsx</code> — entity search + filter toggles + dataset loaders.</p>
-    <p><code>components/RightSidebar.tsx</code> — Explain panel (click-driven) and Chat panel (question-driven). Includes the "Context sent to model" viewer.</p>
-    <p><code>components/ApiKeyModal.tsx</code> — BYOK modal for static deploys.</p>
-    <p><code>components/ui/{Button,Input,Dialog}.tsx</code> — Radix UI + CVA primitives.</p>
-  </div>
-  <div class="card">
-    <h4>Graph / LLM lib</h4>
-    <p><code>lib/graph/types.ts</code> — Graph, GraphNode, GraphEdge, SearchHit.</p>
-    <p><code>lib/graph/ops.ts</code> — pure ops (neighbourhood, applyFilters), browser-safe.</p>
-    <p><code>lib/graph/loader.ts</code> — server-side fs reads of data/*.json.</p>
-    <p><code>lib/graph/runtime.ts</code> — process-wide cache for the search index.</p>
-    <p><code>lib/graph/client-loader.ts</code> — browser fetch of static JSONs (BYOK mode).</p>
-    <p><code>lib/graph/data-api.ts</code> — facade: API route vs. in-browser ops by env.</p>
-    <p><code>lib/graph/retrieve.ts</code> — <strong>GraphRAG core</strong>: entity link → neighbourhoods → BFS shortest paths → structured packet.</p>
-    <p><code>lib/llm/{index,openai,claude-cli,prompts}.ts</code> — provider abstraction.</p>
-    <p><code>lib/llm/browser.ts</code> + <code>browser-pipeline.ts</code> — BYOK browser-side LLM calls.</p>
+<!-- =================== STEP 1: PREREQUISITES =================== -->
+<h2 id="s1">Step 1 — Prerequisites</h2>
+<div class="step">
+  <div class="step-num">1</div>
+  <div class="step-body">
+    <div class="step-head">
+      <p class="step-title">Tools you need installed before starting</p>
+      <span class="step-meta"><span class="pill pill-time">~10 min if starting fresh</span></span>
+    </div>
+    <p class="step-what">macOS or Linux. Windows works under WSL.</p>
+    <div class="step-section-label">Required (for demo + eval)</div>
+    <ul>
+      <li><strong>Python 3.10+</strong> — <code>python3 --version</code></li>
+      <li><strong>Node.js 18+</strong> and <strong>npm</strong> — <code>node -v</code></li>
+      <li><strong>Git</strong> — <code>git --version</code></li>
+      <li><strong>Claude Code CLI</strong> — install from <a href="https://claude.com/claude-code">claude.com/claude-code</a>. Verify with <code>claude --version</code>. The web app and eval both spawn <code>claude -p</code> under the hood and inherit your existing Claude Code auth.</li>
+    </ul>
+    <div class="step-section-label">Required only for Firebase deploy (step 5)</div>
+    <ul>
+      <li><strong>Firebase CLI</strong> — <code>npm install -g firebase-tools</code></li>
+      <li><strong>gcloud CLI</strong> — only needed to grant IAM roles on first deploy of Cloud Functions</li>
+      <li><strong>A Firebase project on the Blaze plan</strong> (Cloud Functions require Blaze; free-tier quotas cover the demo so $0 unless heavily used)</li>
+    </ul>
   </div>
 </div>
 
-<h3>API routes (active only in server build)</h3>
-<table>
-  <thead><tr><th>Route</th><th>What it does</th></tr></thead>
-  <tbody>
-    <tr><td><code>/api/graph</code></td><td>Returns seed view or N-hop neighbourhood around a seed node.</td></tr>
-    <tr><td><code>/api/search</code></td><td>Returns the search index for autocomplete.</td></tr>
-    <tr><td><code>/api/explain</code></td><td>Given (kind, id), runs <code>nodeContext</code>/<code>edgeContext</code> retrieval → LLM → returns answer + retrieved subgraph.</td></tr>
-    <tr><td><code>/api/chat</code></td><td>Given a question, runs <code>retrieveForQuestion</code> → LLM → returns answer + retrieval (entities, paths, subgraph size).</td></tr>
-  </tbody>
-</table>
-
-<h2 id="deploy">4. Two deploy targets</h2>
-
-<div class="grid-2">
-  <div class="card">
-    <h4><span class="pill">Local dev</span></h4>
-    <p><strong><code>npm run dev</code> → http://localhost:3000</strong></p>
-    <p>Server build with API routes active. <code>LLM_PROVIDER=claude-cli</code> in <code>.env.local</code> — every Explain/Chat call spawns <code>claude -p</code> headlessly, reusing your Claude Code auth. No API keys needed.</p>
-  </div>
-  <div class="card">
-    <h4><span class="pill pill-good">Firebase Hosting</span></h4>
-    <p><strong><code>npm run deploy:firebase</code></strong></p>
-    <p>Static export (<code>output: "export"</code>) shipped to <code>polygence-pubmed-graphrag.web.app</code>. The retrieval pipeline runs in the browser (graph.json fetched once + cached). LLM calls go to <code>/api/llm</code> which is rewritten by Hosting to a Firebase Cloud Function (<code>functions/index.js</code>) that calls Gemini with <code>GEMINI_KEY</code> stored as a Firebase secret. The key never enters the JS bundle.</p>
-    <p>Alternatively the user can paste their own OpenAI/Anthropic/Gemini/DeepSeek key in the in-app modal → browser calls the provider directly.</p>
+<!-- =================== STEP 2: CLONE & INSTALL =================== -->
+<h2 id="s2">Step 2 — Clone &amp; install dependencies</h2>
+<div class="step">
+  <div class="step-num">2</div>
+  <div class="step-body">
+    <div class="step-head">
+      <p class="step-title">Get the code and install npm packages</p>
+      <span class="step-meta"><span class="pill pill-time">~3 min</span> <span class="pill pill-cost">$0</span></span>
+    </div>
+    <p class="step-what">Pulls the repo and runs <code>npm install</code> in both <code>web/</code> and <code>functions/</code>.</p>
+<pre class="cmd">git clone https://github.com/mihikap01/polygence-anesthesia-graphRAG
+cd polygence-anesthesia-graphRAG
+scripts/install.sh</pre>
+    <div class="step-section-label">Expected output</div>
+<pre class="out">→ web/  (Next.js + UI)
+   added 411 packages in 28s
+→ functions/  (Firebase Cloud Function)
+   added 86 packages in 4s
+✓ dependencies installed</pre>
+    <div class="step-verify">
+      <strong>Verify:</strong> <code>web/node_modules/</code> and <code>functions/node_modules/</code> both exist.
+    </div>
   </div>
 </div>
 
-<h2 id="eval">5. Eval framework</h2>
-
-<p>An end-to-end Python pipeline under <code>eval/</code>. Every step is deterministic (fixed seeds), resumable, and reproducible from the committed scripts + raw evidence.</p>
-
-<div class="diagram">
-<svg viewBox="0 0 900 720" class="svg-diagram" xmlns="http://www.w3.org/2000/svg">
-  <defs>
-    <filter id="dropshadow2" x="-20%" y="-20%" width="140%" height="140%">
-      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-opacity="0.10"/>
-    </filter>
-    <marker id="arrowhead2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
-      <path d="M0,0 L10,5 L0,10 z" fill="hsl(215 15% 45%)"/>
-    </marker>
-  </defs>
-
-  <!-- Row 1: Setup steps (3 boxes side by side) -->
-  <text class="svg-cap" x="30" y="14" font-weight="600" fill="hsl(215 15% 45%)">SETUP (deterministic, fixed seeds)</text>
-
-  <rect class="svg-code-fill svg-code-stroke" x="30" y="25" width="270" height="100" rx="12" filter="url(#dropshadow2)"/>
-  <text class="svg-title" x="165" y="50" text-anchor="middle">1. Held-out split</text>
-  <text class="svg-sub" x="165" y="68" text-anchor="middle">rebuild_heldout.py</text>
-  <text class="svg-cap" x="165" y="86" text-anchor="middle">30% of 1A/1B/2A/2B rows</text>
-  <text class="svg-cap" x="165" y="100" text-anchor="middle">held out (seed=42)</text>
-  <text class="svg-cap" x="165" y="116" text-anchor="middle">→ data/graph_heldout.json</text>
-
-  <rect class="svg-code-fill svg-code-stroke" x="315" y="25" width="270" height="100" rx="12" filter="url(#dropshadow2)"/>
-  <text class="svg-title" x="450" y="50" text-anchor="middle">2. Question generation</text>
-  <text class="svg-sub" x="450" y="68" text-anchor="middle">generate_questions.py</text>
-  <text class="svg-cap" x="450" y="86" text-anchor="middle">187 Qs across 8 strata</text>
-  <text class="svg-cap" x="450" y="100" text-anchor="middle">templates per stratum (seed=7)</text>
-  <text class="svg-cap" x="450" y="116" text-anchor="middle">→ questions.jsonl (with gold)</text>
-
-  <rect class="svg-code-fill svg-code-stroke" x="600" y="25" width="270" height="100" rx="12" filter="url(#dropshadow2)"/>
-  <text class="svg-title" x="735" y="50" text-anchor="middle">3. A1 RAG index</text>
-  <text class="svg-sub" x="735" y="68" text-anchor="middle">a1_index.py</text>
-  <text class="svg-cap" x="735" y="86" text-anchor="middle">BM25 + MiniLM dense</text>
-  <text class="svg-cap" x="735" y="100" text-anchor="middle">over reduced TSVs</text>
-  <text class="svg-cap" x="735" y="116" text-anchor="middle">→ .cache/ (~20s, local)</text>
-
-  <!-- Converging bus → generation -->
-  <line class="svg-line" x1="165" y1="125" x2="165" y2="155"/>
-  <line class="svg-line" x1="450" y1="125" x2="450" y2="155"/>
-  <line class="svg-line" x1="735" y1="125" x2="735" y2="155"/>
-  <line class="svg-bus" x1="165" y1="155" x2="735" y2="155"/>
-  <line class="svg-line" x1="450" y1="155" x2="450" y2="180" marker-end="url(#arrowhead2)"/>
-
-  <!-- GENERATION block (large) -->
-  <text class="svg-cap" x="30" y="174" font-weight="600" fill="hsl(215 15% 45%)">GENERATION (~3-4 h on Claude Sonnet, ~$25, resumable)</text>
-  <rect class="svg-accent-fill svg-accent-stroke" x="60" y="185" width="780" height="190" rx="14" filter="url(#dropshadow2)"/>
-  <text class="svg-title" x="450" y="212" text-anchor="middle">4. run.py + arms.py — generate 3 × 187 = 561 answers</text>
-  <text class="svg-sub" x="450" y="232" text-anchor="middle">All via `claude -p --model sonnet` · same system prompt across arms</text>
-
-  <!-- Three sub-arms inside -->
-  <rect class="svg-code-fill svg-code-stroke" x="90" y="250" width="230" height="110" rx="10"/>
-  <text class="svg-title" x="205" y="272" text-anchor="middle">A0 · LLM alone</text>
-  <text class="svg-sub" x="205" y="290" text-anchor="middle">No retrieved context</text>
-  <text class="svg-cap" x="205" y="312" text-anchor="middle">tests parametric</text>
-  <text class="svg-cap" x="205" y="326" text-anchor="middle">knowledge baseline</text>
-  <text class="svg-cap" x="205" y="345" text-anchor="middle" font-family="JetBrains Mono, monospace">→ arms.py: run_a0()</text>
-
-  <rect class="svg-code-fill svg-code-stroke" x="335" y="250" width="230" height="110" rx="10"/>
-  <text class="svg-title" x="450" y="272" text-anchor="middle">A1 · plain-text RAG</text>
-  <text class="svg-sub" x="450" y="290" text-anchor="middle">BM25 + dense, RRF, top-8</text>
-  <text class="svg-cap" x="450" y="312" text-anchor="middle">isolates what retrieval</text>
-  <text class="svg-cap" x="450" y="326" text-anchor="middle">alone provides</text>
-  <text class="svg-cap" x="450" y="345" text-anchor="middle" font-family="JetBrains Mono, monospace">→ a1_retrieve.py</text>
-
-  <rect class="svg-app-fill svg-app-stroke" x="580" y="250" width="230" height="110" rx="10"/>
-  <text class="svg-title" x="695" y="272" text-anchor="middle">A3 · subgraph RAG</text>
-  <text class="svg-sub" x="695" y="290" text-anchor="middle">Entity-link + 1-hop nbhd</text>
-  <text class="svg-cap" x="695" y="306" text-anchor="middle">+ BFS shortest paths</text>
-  <text class="svg-cap" x="695" y="325" text-anchor="middle">tests graph structure value</text>
-  <text class="svg-cap" x="695" y="345" text-anchor="middle" font-family="JetBrains Mono, monospace">→ retrieve_py.py</text>
-
-  <!-- Arrow down to scoring -->
-  <line class="svg-line" x1="450" y1="375" x2="450" y2="395"/>
-  <line class="svg-bus" x1="120" y1="395" x2="780" y2="395"/>
-  <line class="svg-line" x1="120" y1="395" x2="120" y2="420" marker-end="url(#arrowhead2)"/>
-  <line class="svg-line" x1="340" y1="395" x2="340" y2="420" marker-end="url(#arrowhead2)"/>
-  <line class="svg-line" x1="560" y1="395" x2="560" y2="420" marker-end="url(#arrowhead2)"/>
-  <line class="svg-line" x1="780" y1="395" x2="780" y2="420" marker-end="url(#arrowhead2)"/>
-
-  <!-- Scoring row: 4 boxes -->
-  <text class="svg-cap" x="30" y="414" font-weight="600" fill="hsl(215 15% 45%)">SCORING (four independent metric families)</text>
-
-  <rect class="svg-data-fill svg-data-stroke" x="30" y="425" width="180" height="130" rx="12" filter="url(#dropshadow2)"/>
-  <text class="svg-title" x="120" y="450" text-anchor="middle">grade.py</text>
-  <text class="svg-sub" x="120" y="468" text-anchor="middle">Rule-based (Python)</text>
-  <text class="svg-cap" x="120" y="488" text-anchor="middle">PMID-exists</text>
-  <text class="svg-cap" x="120" y="502" text-anchor="middle">entity precision/recall</text>
-  <text class="svg-cap" x="120" y="516" text-anchor="middle">evidence-level match</text>
-  <text class="svg-cap" x="120" y="530" text-anchor="middle">refusal correctness</text>
-  <text class="svg-cap" x="120" y="547" text-anchor="middle" font-style="italic">deterministic, no LLM</text>
-
-  <rect class="svg-data-fill svg-data-stroke" x="250" y="425" width="180" height="130" rx="12" filter="url(#dropshadow2)"/>
-  <text class="svg-title" x="340" y="450" text-anchor="middle">judge.py</text>
-  <text class="svg-sub" x="340" y="468" text-anchor="middle">Pairwise preference</text>
-  <text class="svg-cap" x="340" y="488" text-anchor="middle">A3 vs A1 (PRIMARY)</text>
-  <text class="svg-cap" x="340" y="502" text-anchor="middle">A3 vs A0 (secondary)</text>
-  <text class="svg-cap" x="340" y="516" text-anchor="middle">blinded, order randomised</text>
-  <text class="svg-cap" x="340" y="530" text-anchor="middle">374 comparisons</text>
-  <text class="svg-cap" x="340" y="547" text-anchor="middle" font-style="italic">Haiku judge, parallel</text>
-
-  <rect class="svg-data-fill svg-data-stroke" x="470" y="425" width="180" height="130" rx="12" filter="url(#dropshadow2)"/>
-  <text class="svg-title" x="560" y="450" text-anchor="middle">judge_rubric.py</text>
-  <text class="svg-sub" x="560" y="468" text-anchor="middle">Anchored 1–5 rubric</text>
-  <text class="svg-cap" x="560" y="488" text-anchor="middle">Faithfulness</text>
-  <text class="svg-cap" x="560" y="502" text-anchor="middle">Completeness</text>
-  <text class="svg-cap" x="560" y="516" text-anchor="middle">Clinical soundness</text>
-  <text class="svg-cap" x="560" y="530" text-anchor="middle">vs ground truth</text>
-  <text class="svg-cap" x="560" y="547" text-anchor="middle" font-style="italic">Haiku judge, parallel</text>
-
-  <rect class="svg-data-fill svg-data-stroke" x="690" y="425" width="180" height="130" rx="12" filter="url(#dropshadow2)"/>
-  <text class="svg-title" x="780" y="450" text-anchor="middle">segment.py</text>
-  <text class="svg-sub" x="780" y="468" text-anchor="middle">Merged-claim</text>
-  <text class="svg-cap" x="780" y="488" text-anchor="middle">extract union of claims</text>
-  <text class="svg-cap" x="780" y="502" text-anchor="middle">across all 4 arms</text>
-  <text class="svg-cap" x="780" y="516" text-anchor="middle">label each: supported /</text>
-  <text class="svg-cap" x="780" y="530" text-anchor="middle">unsupported / unverifiable</text>
-  <text class="svg-cap" x="780" y="547" text-anchor="middle" font-style="italic">→ hallucination rate</text>
-
-  <!-- Bus converging back to report -->
-  <line class="svg-line" x1="120" y1="555" x2="120" y2="585"/>
-  <line class="svg-line" x1="340" y1="555" x2="340" y2="585"/>
-  <line class="svg-line" x1="560" y1="555" x2="560" y2="585"/>
-  <line class="svg-line" x1="780" y1="555" x2="780" y2="585"/>
-  <line class="svg-bus" x1="120" y1="585" x2="780" y2="585"/>
-  <line class="svg-line" x1="450" y1="585" x2="450" y2="610" marker-end="url(#arrowhead2)"/>
-
-  <!-- Report block -->
-  <rect class="svg-app-fill svg-app-stroke" x="240" y="615" width="420" height="90" rx="14" filter="url(#dropshadow2)"/>
-  <text class="svg-title" x="450" y="640" text-anchor="middle">report.py — aggregate everything</text>
-  <text class="svg-sub" x="450" y="660" text-anchor="middle">eval/report.html (human-readable)</text>
-  <text class="svg-cap" x="450" y="680" text-anchor="middle">eval/results.json (machine-readable)</text>
-  <text class="svg-cap" x="450" y="695" text-anchor="middle">→ deployed at /eval-report</text>
-</svg>
+<!-- =================== STEP 3: BUILD GRAPH =================== -->
+<h2 id="s3">Step 3 — Build the PharmGKB knowledge graph</h2>
+<div class="step">
+  <div class="step-num">3</div>
+  <div class="step-body">
+    <div class="step-head">
+      <p class="step-title">Turn the raw TSVs into JSON artifacts</p>
+      <span class="step-meta"><span class="pill pill-time">~3 seconds</span> <span class="pill pill-cost">$0</span></span>
+    </div>
+    <p class="step-what">A single Python script (no pip dependencies, just stdlib) parses six PharmGKB TSVs and produces three JSON files under <code>data/</code>.</p>
+<pre class="cmd">python3 preprocess/build_graph.py</pre>
+    <div class="step-section-label">What this does</div>
+    <ul>
+      <li>Parses <code>clinicalVariants.tsv</code> (5,188 rows) as the backbone</li>
+      <li>Harvests PMIDs from <code>relationships.tsv</code> (127k rows)</li>
+      <li>Drops <em>not associated</em> / <em>ambiguous</em> rows (focuses on the signal graph)</li>
+      <li>Collapses rsIDs into per-gene variant clusters</li>
+      <li>Injects curated drug-class nodes (Volatile Anesthetics, NMBs, etc.)</li>
+      <li>Tags 1A/1B Toxicity edges as <em>CRITICAL</em> (highlighted red in the UI)</li>
+    </ul>
+    <div class="step-section-label">Expected output</div>
+<pre class="out">Loading reference metadata...
+  genes=25041  drugs=11535  phenotypes=1615
+Building simplified graph...
+  nodes=3213  edges=8024
+Building anesthesia seed view...
+  seed nodes=36  seed edges=62
+Writing JSON artifacts to data/...
+Done.</pre>
+    <div class="step-verify">
+      <strong>Verify:</strong> <code>ls data/</code> should show <code>graph.json</code> (~2 MB), <code>seed_anesthesia.json</code> (~28 KB), <code>search_index.json</code> (~302 KB).
+    </div>
+  </div>
 </div>
 
+<!-- =================== STEP 4: RUN DEMO LOCALLY =================== -->
+<h2 id="s4">Step 4 — Run the web app locally</h2>
+<div class="step">
+  <div class="step-num">4</div>
+  <div class="step-body">
+    <div class="step-head">
+      <p class="step-title">Start the Next.js dev server</p>
+      <span class="step-meta"><span class="pill pill-time">~5 sec to start, stays open</span> <span class="pill pill-cost">$0 (uses your Claude Code auth)</span></span>
+    </div>
+    <p class="step-what">The dev script auto-installs deps and builds the graph if missing.</p>
+<pre class="cmd">scripts/dev.sh
+# → opens http://localhost:3000</pre>
+    <div class="step-section-label">Try in the browser</div>
+    <ol>
+      <li>The page loads with the anesthesia / malignant-hyperthermia subgraph (36 nodes) — sevoflurane, succinylcholine, RYR1 cluster, CACNA1S, etc.</li>
+      <li><strong>Click any node</strong> (try <code>RYR1</code>) → the right Explain panel runs <code>/api/explain</code>, which fires <code>retrieveForQuestion()</code> for its 2-hop neighborhood and spawns <code>claude -p</code> in the background. Answer arrives in ~3-8 seconds.</li>
+      <li><strong>Switch to the Chat tab</strong> and ask: <em>"Why is sevoflurane risky for malignant hyperthermia?"</em>. Watch the retrieval strip at the top of the answer — it shows the linked entities (sevoflurane, MH, isoflurane noise), the shortest paths surfaced, and the subgraph size in nodes/edges.</li>
+      <li><strong>Expand "Context sent to model"</strong> at the bottom of any answer — this shows the exact system prompt, user prompt, retrieved subgraph, and token estimate. Every retrieval step is observable.</li>
+    </ol>
+    <div class="step-verify">
+      <strong>Verify:</strong> <code>curl http://localhost:3000/api/graph?view=seed</code> returns a JSON graph with 36 nodes.
+    </div>
+  </div>
+</div>
+
+<!-- =================== STEP 5: (OPTIONAL) DEPLOY =================== -->
+<h2 id="s5">Step 5 — (Optional) Deploy to Firebase Hosting</h2>
+<div class="step">
+  <div class="step-num">5</div>
+  <div class="step-body">
+    <div class="step-head">
+      <p class="step-title">Push to a public URL</p>
+      <span class="step-meta"><span class="pill pill-opt">Optional</span> <span class="pill pill-time">~10 min first time</span> <span class="pill pill-cost">~$0 on free tier</span></span>
+    </div>
+    <p class="step-what">Skip this if you only want the local demo. Required only to make the site public.</p>
+    <div class="step-section-label">5a. Authenticate</div>
+<pre class="cmd">firebase login
+gcloud auth login   # only needed once, for IAM grants on first deploy</pre>
+    <div class="step-section-label">5b. Store the LLM key as a Firebase secret (one-time)</div>
+<pre class="cmd">scripts/set-gemini-key.sh
+# paste your Gemini API key when prompted</pre>
+    <p class="muted" style="font-size:12px;">The key stays in Google Secret Manager and is read only by the Cloud Function. It never enters the JS bundle.</p>
+    <div class="step-section-label">5c. Build and deploy</div>
+<pre class="cmd">scripts/deploy-firebase.sh
+# → publishes to https://&lt;project-id&gt;.web.app</pre>
+    <div class="step-verify">
+      <strong>Verify:</strong> the deploy output prints the live URL. <code>curl &lt;url&gt;</code> returns 200; <code>curl -X POST &lt;url&gt;/api/llm -H "Content-Type: application/json" -d '{"systemPrompt":"hi","userPrompt":"say hello"}'</code> returns a Gemini response.
+    </div>
+  </div>
+</div>
+
+<!-- =================== STEPS 6-9: EVAL =================== -->
+<h2 id="s6">Step 6 — Reproduce the evaluation: setup</h2>
+
+<div class="group-banner">
+  <strong>Steps 6 through 9</strong> reproduce the full evaluation reported at
+  <a href="/eval-report">/eval-report</a>. Total wall time ~5 hours,
+  total Claude API spend ~$45. Skip ahead to step 10 if you only want the demo.
+</div>
+
+<div class="step">
+  <div class="step-num">6</div>
+  <div class="step-body">
+    <div class="step-head">
+      <p class="step-title">Three setup scripts (deterministic, no LLM cost)</p>
+      <span class="step-meta"><span class="pill pill-time">~30 sec total</span> <span class="pill pill-cost">$0</span></span>
+    </div>
+    <p class="step-what">Build the held-out split, generate questions, build A1's plain-text-RAG index. All seeds are fixed.</p>
+    <div class="step-section-label">6a — held-out split (seed=42)</div>
+<pre class="cmd">python3 eval/rebuild_heldout.py</pre>
+<pre class="out">held-out: 120 rows (30%, seed=42)
+[heldout] dropped 120 clinicalVariants rows
+  nodes=3203  edges=7972
+reduced graph: data/graph_heldout.json
+held-out rows: eval/heldout_variants.tsv</pre>
+    <div class="step-section-label">6b — generate 187 questions (seed=7)</div>
+<pre class="cmd">python3 eval/generate_questions.py</pre>
+<pre class="out">loaded 120 held-out rows
+wrote 187 questions to eval/questions.jsonl
+  S1: 20 · S2: 25 · S3: 40 · S4: 25 · S5: 25 · S6: 25 · S7: 15 · S8: 12</pre>
+    <div class="step-section-label">6c — A1's plain-text RAG index (BM25 + dense, ~20 sec, runs locally on CPU)</div>
+<pre class="cmd">python3 eval/a1_index.py</pre>
+<pre class="out">clinicalVariants: kept 280 chunks, dropped 120 held-out
+relationships: kept 20000 chunks
+total: 20280 chunks
+embedding with sentence-transformers/all-MiniLM-L6-v2...
+done. cached to eval/.cache/</pre>
+    <div class="step-verify">
+      <strong>Verify:</strong> <code>wc -l eval/questions.jsonl</code> → 187. <code>ls eval/.cache/</code> → BM25 pickle + embeddings npy + chunks json.
+    </div>
+  </div>
+</div>
+
+<!-- ============= STEP 7: GENERATION ============= -->
+<h2 id="s7">Step 7 — Reproduce the evaluation: generation</h2>
+<div class="step">
+  <div class="step-num">7</div>
+  <div class="step-body">
+    <div class="step-head">
+      <p class="step-title">Generate the 561 answers (3 arms × 187 questions)</p>
+      <span class="step-meta"><span class="pill pill-warn">~3-4 hours</span> <span class="pill pill-cost">~$25</span> <span class="pill pill-time">resumable</span></span>
+    </div>
+    <p class="step-what">For each question, runs three arms in turn via <code>claude -p --model sonnet</code>:</p>
+    <ul>
+      <li><strong>A0</strong> — no retrieved context (the LLM alone)</li>
+      <li><strong>A1</strong> — plain-text RAG (top-8 chunks from step 6c, RRF-fused)</li>
+      <li><strong>A3</strong> — subgraph RAG (entity-link → 1-hop neighborhood → shortest paths via <code>eval/retrieve_py.py</code>)</li>
+    </ul>
+<pre class="cmd">python3 eval/run.py --model sonnet</pre>
+    <div class="step-section-label">Progress output</div>
+<pre class="out">questions: 187, already done: 0, arms: ['A0', 'A1', 'A2', 'A3']
+model: sonnet
+A3: loaded held-out graph (3203 nodes)
+[5/748]  S1-002 A0   11.8s  $0.0432  ✓ 1389 chars  · eta 31.0min  · $0.04 total
+[6/748]  S1-002 A1   11.7s  $0.0298  ✓ 1083 chars  · eta 63.9min  · $0.07 total
+...</pre>
+    <p class="muted" style="font-size:13px;">
+      <strong>Resumable:</strong> if the process exits or hits a rate limit, just re-run the
+      same command — already-completed <code>(question, arm)</code> pairs are skipped.
+    </p>
+    <div class="step-verify">
+      <strong>Verify:</strong> <code>wc -l eval/answers.jsonl</code> → 561+ records (resume retries may add a few duplicates that the grader dedupes). Run <code>python3 -c "import json; d={(json.loads(l)['question_id'], json.loads(l)['arm']) for l in open('eval/answers.jsonl') if not json.loads(l).get('error')}; print(len(d))"</code> to count unique successful (qid, arm) pairs — should be ≥ 560.
+    </div>
+  </div>
+</div>
+
+<!-- ============= STEP 8: SCORING ============= -->
+<h2 id="s8">Step 8 — Reproduce the evaluation: scoring (four metric families)</h2>
+
+<div class="step">
+  <div class="step-num">8a</div>
+  <div class="step-body">
+    <div class="step-head">
+      <p class="step-title">Rule-based metrics (deterministic Python, no LLM)</p>
+      <span class="step-meta"><span class="pill pill-time">~3 sec</span> <span class="pill pill-cost">$0</span></span>
+    </div>
+    <p class="step-what">PMID-exists, entity precision/recall, evidence-level exact-match, refusal correctness — all defined symmetrically across arms.</p>
+<pre class="cmd">python3 eval/grade.py</pre>
+<pre class="out">loading corpus PMID set...
+  9,128 unique PMIDs in relationships.tsv
+grading 748 unique (question, arm) pairs (from 811 raw rows)...
+wrote 748 scores to eval/scores.jsonl</pre>
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-num">8b</div>
+  <div class="step-body">
+    <div class="step-head">
+      <p class="step-title">Blinded pairwise preference (THE PRIMARY TEST)</p>
+      <span class="step-meta"><span class="pill pill-time">~20 min @ 6 workers</span> <span class="pill pill-cost">~$7</span></span>
+    </div>
+    <p class="step-what">For each question, Claude Haiku judges A3 vs A1 (primary) and A3 vs A0 (secondary), blinded, with order randomised. Sign-test p-value reported.</p>
+<pre class="cmd">python3 eval/judge.py --workers 6 --model haiku</pre>
+<pre class="out">judging: 374 comparisons total · 0 done · 374 to do
+model=haiku · workers=6
+[1/374]  S1-001 A3_vs_A1  12.4s  → A1  · eta 11.4m  · $0.02
+...
+done. judgments in eval/judgments.jsonl · $7.13 · 18.0min</pre>
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-num">8c</div>
+  <div class="step-body">
+    <div class="step-head">
+      <p class="step-title">Anchored 1–5 rubric ratings</p>
+      <span class="step-meta"><span class="pill pill-time">~30 min @ 8 workers</span> <span class="pill pill-cost">~$9</span></span>
+    </div>
+    <p class="step-what">Per answer, Haiku rates Faithfulness / Completeness / Clinical-soundness 1–5 against ground truth.</p>
+<pre class="cmd">python3 eval/judge_rubric.py --workers 8 --model haiku</pre>
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-num">8d</div>
+  <div class="step-body">
+    <div class="step-head">
+      <p class="step-title">Merged-claim hallucination rate</p>
+      <span class="step-meta"><span class="pill pill-time">~40 min @ 4 workers</span> <span class="pill pill-cost">~$3</span></span>
+    </div>
+    <p class="step-what">Per question, the judge extracts the union of atomic factual claims across all four answers and labels each as supported / unsupported / unverifiable. Same denominator across arms.</p>
+<pre class="cmd">python3 eval/segment.py --workers 4 --model haiku</pre>
+    <p class="muted" style="font-size:12px;">Note: this script is known to hit Claude CLI hangs on some questions (the 120s timeout doesn't always fire cleanly). The original run achieved 57/187 coverage before being stopped. Treat the rates as directional, not definitive.</p>
+  </div>
+</div>
+
+<!-- ============= STEP 9: REPORT ============= -->
+<h2 id="s9">Step 9 — Generate the final report</h2>
+<div class="step">
+  <div class="step-num">9</div>
+  <div class="step-body">
+    <div class="step-head">
+      <p class="step-title">Aggregate everything into eval/report.html</p>
+      <span class="step-meta"><span class="pill pill-time">~1 sec</span> <span class="pill pill-cost">$0</span></span>
+    </div>
+    <p class="step-what">Reads all the *.jsonl outputs, computes the headline tables, generates the research report HTML and a machine-readable results.json.</p>
+<pre class="cmd">python3 eval/report.py
+open eval/report.html  # or upload to Firebase via scripts/deploy-firebase.sh</pre>
+<pre class="out">loaded 748 scores, 374 judgments, 491 rubric ratings, 96 segment runs
+wrote eval/report.html and eval/results.json</pre>
+    <div class="step-verify">
+      <strong>Verify:</strong> <code>open eval/report.html</code> shows the 7-section research report. The headline pairwise table should report ~49% A3 preference vs A1 with p ≈ 0.83 (assuming the same generator + judge models).
+    </div>
+  </div>
+</div>
+
+<!-- =================== STEP 10: WHAT YOU'LL HAVE =================== -->
+<h2 id="s10">Step 10 — What you'll have at the end</h2>
+
 <table>
-  <thead><tr><th>Script</th><th>Output</th><th>Wall time</th><th>Approx cost</th></tr></thead>
+  <thead>
+    <tr><th>Path</th><th>What it is</th><th>Size</th></tr>
+  </thead>
   <tbody>
-    <tr><td><code>rebuild_heldout.py</code></td><td>heldout_variants.tsv + graph_heldout.json</td><td>~5 s</td><td>0</td></tr>
-    <tr><td><code>generate_questions.py</code></td><td>questions.jsonl (187 records)</td><td>~3 s</td><td>0</td></tr>
-    <tr><td><code>a1_index.py</code></td><td>cached BM25 + dense embeddings</td><td>~20 s</td><td>0 (local model)</td></tr>
-    <tr><td><code>run.py --model sonnet</code></td><td>answers.jsonl (561+ records)</td><td>~3-4 h</td><td>~$25</td></tr>
-    <tr><td><code>grade.py</code></td><td>scores.jsonl</td><td>~3 s</td><td>0</td></tr>
-    <tr><td><code>judge.py --workers 6</code></td><td>judgments.jsonl (374 pairwise)</td><td>~20 min</td><td>~$7</td></tr>
-    <tr><td><code>judge_rubric.py --workers 8</code></td><td>rubric.jsonl (~750 records)</td><td>~30 min</td><td>~$9</td></tr>
-    <tr><td><code>segment.py --workers 4</code></td><td>segments.jsonl (~185 records)</td><td>~40 min</td><td>~$3</td></tr>
-    <tr><td><code>report.py</code></td><td>report.html + results.json</td><td>~1 s</td><td>0</td></tr>
-    <tr><td><strong>Total</strong></td><td></td><td><strong>~5 h</strong></td><td><strong>~$45</strong></td></tr>
+    <tr><td><code>data/graph.json</code></td><td>The full knowledge graph (3,213 nodes / 8,024 edges)</td><td>~2 MB</td></tr>
+    <tr><td><code>data/graph_heldout.json</code></td><td>Same graph minus the 120 held-out rows (3,203 / 7,972)</td><td>~2 MB</td></tr>
+    <tr><td><code>data/seed_anesthesia.json</code></td><td>The 36-node demo subgraph</td><td>~28 KB</td></tr>
+    <tr><td><code>data/search_index.json</code></td><td>Flat entity index for autocomplete + linking</td><td>~302 KB</td></tr>
+    <tr><td><code>eval/questions.jsonl</code></td><td>187 held-out questions with gold records</td><td>~94 KB</td></tr>
+    <tr><td><code>eval/answers.jsonl</code></td><td>All 561+ LLM responses (raw evidence)</td><td>~970 KB</td></tr>
+    <tr><td><code>eval/scores.jsonl</code></td><td>Rule-based metric scores per answer</td><td>~232 KB</td></tr>
+    <tr><td><code>eval/judgments.jsonl</code></td><td>374 pairwise preference judgments</td><td>~196 KB</td></tr>
+    <tr><td><code>eval/rubric.jsonl</code></td><td>Per-answer F/C/CS ratings</td><td>~192 KB</td></tr>
+    <tr><td><code>eval/segments.jsonl</code></td><td>Per-question merged-claim records</td><td>~132 KB</td></tr>
+    <tr><td><code>eval/report.html</code></td><td>The 7-section research report</td><td>~76 KB</td></tr>
+    <tr><td><code>eval/results.json</code></td><td>Machine-readable summary of all metrics</td><td>~11 KB</td></tr>
   </tbody>
 </table>
 
-<h2 id="flow">6. End-to-end flow for one question</h2>
+<h3>Total spend</h3>
+<ul>
+  <li><strong>Time:</strong> ~5 hours wall-clock (most of it step 7's generation; rate-limit interruptions can extend this)</li>
+  <li><strong>Cost:</strong> ~$45 in Claude API spend ($25 generation + $7 pairwise + $9 rubric + $3 segmentation + miscellaneous)</li>
+  <li><strong>Disk:</strong> ~5 MB committed evidence (raw outputs are gitignored unless you check them in)</li>
+</ul>
 
-<p>To make the abstraction concrete, here's what happens when a user asks <em>"Why is sevoflurane risky for malignant hyperthermia?"</em> on the live web app:</p>
+<h3>Recommended next steps</h3>
+<p>If you want to make the eval stronger (per the report's "Conclusions" section §7):</p>
+<ol style="font-size:14px;">
+  <li>Hold out <code>relationships.tsv</code> rows in parallel with <code>clinicalVariants.tsv</code> to close the partial-leakage confound (see report §6.2).</li>
+  <li>Inline PMIDs into A3's structured context (~10-line change in <code>eval/retrieve_py.py</code>); re-run the citation stratum only.</li>
+  <li>Re-judge with a cross-family judge (Gemini instead of Haiku) and compare against the within-Claude result.</li>
+  <li>Add a hybrid arm (A4 = A3's subgraph + A1's top-3 chunks) and re-run pairwise.</li>
+  <li>For more ambitious work: implement a Microsoft-style GraphRAG arm with Leiden communities + LLM-generated community summaries.</li>
+</ol>
 
-<div class="diagram">
-<svg viewBox="0 0 900 760" class="svg-diagram" xmlns="http://www.w3.org/2000/svg">
-  <defs>
-    <filter id="dropshadow3" x="-20%" y="-20%" width="140%" height="140%">
-      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-opacity="0.10"/>
-    </filter>
-    <marker id="arrowhead3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
-      <path d="M0,0 L10,5 L0,10 z" fill="hsl(215 15% 45%)"/>
-    </marker>
-  </defs>
-
-  <!-- Step 1: Browser → user types question -->
-  <circle cx="55" cy="50" r="18" fill="hsl(195 35% 42%)"/>
-  <text class="svg-step-num" x="55" y="55" text-anchor="middle">1</text>
-  <rect class="svg-app-fill svg-app-stroke" x="90" y="20" width="780" height="60" rx="12" filter="url(#dropshadow3)"/>
-  <text class="svg-title" x="110" y="44">Browser — RightSidebar Chat panel</text>
-  <text class="svg-sub" x="110" y="64">User types: <tspan font-style="italic">"Why is sevoflurane risky for malignant hyperthermia?"</tspan></text>
-
-  <line class="svg-line" x1="465" y1="80" x2="465" y2="105" marker-end="url(#arrowhead3)"/>
-
-  <!-- Step 2: Client-side retrieval (the GraphRAG core) -->
-  <circle cx="55" cy="160" r="18" fill="hsl(195 35% 42%)"/>
-  <text class="svg-step-num" x="55" y="165" text-anchor="middle">2</text>
-  <rect class="svg-app-fill svg-app-stroke" x="90" y="110" width="780" height="280" rx="12" filter="url(#dropshadow3)"/>
-  <text class="svg-title" x="110" y="134">Browser-side GraphRAG retrieval — lib/graph/retrieve.ts</text>
-  <text class="svg-sub" x="110" y="152">(runs in the browser before any network call; same logic ported to Python in eval/retrieve_py.py)</text>
-
-  <!-- 4 sub-steps inside the box -->
-  <rect class="svg-code-fill svg-code-stroke" x="110" y="166" width="370" height="100" rx="10"/>
-  <text class="svg-title" x="125" y="186">a) link_entities(question, graph)</text>
-  <text class="svg-cap" x="125" y="206">→ fuzzy-match question n-grams vs 3,213 nodes</text>
-  <text class="svg-cap" x="125" y="222">  (Fuse.js, threshold 0.18)</text>
-  <text class="svg-cap" x="125" y="240">finds: sevoflurane (drug),</text>
-  <text class="svg-cap" x="125" y="256">       Malignant Hyperthermia (phenotype)</text>
-
-  <rect class="svg-code-fill svg-code-stroke" x="490" y="166" width="370" height="100" rx="10"/>
-  <text class="svg-title" x="505" y="186">b) neighborhood(graph, [id], hops=1)</text>
-  <text class="svg-cap" x="505" y="206">→ BFS over adjacency list, 1 hop</text>
-  <text class="svg-cap" x="505" y="222">per linked entity</text>
-  <text class="svg-cap" x="505" y="240">→ ~22 edges to RYR1, succinylcholine,</text>
-  <text class="svg-cap" x="505" y="256">    Volatile Anesthetics class, etc.</text>
-
-  <rect class="svg-code-fill svg-code-stroke" x="110" y="275" width="370" height="100" rx="10"/>
-  <text class="svg-title" x="125" y="295">c) shortest_path(from, to, max=4)</text>
-  <text class="svg-cap" x="125" y="315">→ BFS between every pair of entities</text>
-  <text class="svg-cap" x="125" y="331">preferring CRITICAL / L1A edges</text>
-  <text class="svg-cap" x="125" y="349">→ 3 paths surfaced</text>
-  <text class="svg-cap" x="125" y="365">  (e.g. sevoflurane → RYR1 → MH, 2 hops)</text>
-
-  <rect class="svg-code-fill svg-code-stroke" x="490" y="275" width="370" height="100" rx="10"/>
-  <text class="svg-title" x="505" y="295">d) render_a3_context(...)</text>
-  <text class="svg-cap" x="505" y="315">→ structured text block with sections:</text>
-  <text class="svg-cap" x="505" y="331">  ENTITIES IDENTIFIED</text>
-  <text class="svg-cap" x="505" y="347">  DIRECT NEIGHBOURHOOD OF ...</text>
-  <text class="svg-cap" x="505" y="363">  SHORTEST REASONING PATHS</text>
-
-  <line class="svg-line" x1="465" y1="390" x2="465" y2="415" marker-end="url(#arrowhead3)"/>
-
-  <!-- Step 3: POST to /api/llm -->
-  <circle cx="55" cy="450" r="18" fill="hsl(195 35% 42%)"/>
-  <text class="svg-step-num" x="55" y="455" text-anchor="middle">3</text>
-  <rect class="svg-infra-fill svg-infra-stroke" x="90" y="420" width="780" height="60" rx="12" filter="url(#dropshadow3)"/>
-  <text class="svg-title" x="110" y="445">POST /api/llm  ·  {systemPrompt, userPrompt} where userPrompt = context block + question</text>
-  <text class="svg-sub" x="110" y="465">Firebase Hosting rewrites /api/llm → Cloud Function `ask` in us-central1</text>
-
-  <line class="svg-line" x1="465" y1="480" x2="465" y2="505" marker-end="url(#arrowhead3)"/>
-
-  <!-- Step 4: Cloud Function -->
-  <circle cx="55" cy="540" r="18" fill="hsl(195 35% 42%)"/>
-  <text class="svg-step-num" x="55" y="545" text-anchor="middle">4</text>
-  <rect class="svg-infra-fill svg-infra-stroke" x="90" y="510" width="780" height="80" rx="12" filter="url(#dropshadow3)"/>
-  <text class="svg-title" x="110" y="535">Cloud Function — functions/index.js</text>
-  <text class="svg-sub" x="110" y="555">Origin check (only *.web.app + localhost) · per-IP rate limit (20/min/instance)</text>
-  <text class="svg-cap" x="110" y="577">Reads GEMINI_KEY from Secret Manager · forwards to generativelanguage.googleapis.com</text>
-
-  <line class="svg-line" x1="465" y1="590" x2="465" y2="615" marker-end="url(#arrowhead3)"/>
-
-  <!-- Step 5: Gemini -->
-  <circle cx="55" cy="650" r="18" fill="hsl(195 35% 42%)"/>
-  <text class="svg-step-num" x="55" y="655" text-anchor="middle">5</text>
-  <rect class="svg-accent-fill svg-accent-stroke" x="90" y="620" width="780" height="60" rx="12" filter="url(#dropshadow3)"/>
-  <text class="svg-title" x="110" y="644">Gemini 2.5 Flash generates the answer</text>
-  <text class="svg-sub" x="110" y="664">Grounded in the structured GraphRAG context · cites PMIDs when available · refuses if context is empty</text>
-
-  <line class="svg-line" x1="465" y1="680" x2="465" y2="705" marker-end="url(#arrowhead3)"/>
-
-  <!-- Step 6: Response back to browser -->
-  <circle cx="55" cy="735" r="18" fill="hsl(195 35% 42%)"/>
-  <text class="svg-step-num" x="55" y="740" text-anchor="middle">6</text>
-  <rect class="svg-app-fill svg-app-stroke" x="90" y="710" width="780" height="46" rx="12" filter="url(#dropshadow3)"/>
-  <text class="svg-title" x="110" y="732">Response → RightSidebar: answer + PMID chips + "Context sent to model" panel (opens to show exact prompt)</text>
-</svg>
+<h3>Reference: full repo layout</h3>
+<div class="file-tree">polygence-anesthesia-graphRAG/
+├── README.md
+├── CLAUDE.md                       <span class="dim"># quick reference for AI coding assistants</span>
+├── architecture.html               <span class="dim"># this page (also at /architecture)</span>
+├── firebase.json + .firebaserc     <span class="dim"># Firebase Hosting + Functions config</span>
+│
+├── *.tsv                           <span class="dim"># raw PharmGKB data (~160k rows)</span>
+├── preprocess/build_graph.py       <span class="dim"># TSV → JSON graph (Python stdlib only)</span>
+├── data/                           <span class="dim"># generated JSON (gitignored — rerun script)</span>
+│
+├── functions/                      <span class="dim"># Firebase Cloud Function: /api/llm → Gemini</span>
+│   ├── index.js
+│   └── package.json
+│
+├── web/                            <span class="dim"># Next.js 14 + TypeScript app</span>
+│   ├── app/                        <span class="dim">#   pages + API routes</span>
+│   ├── components/                 <span class="dim">#   GraphCanvas + sidebars + modal</span>
+│   ├── lib/                        <span class="dim">#   graph retrieval + LLM provider</span>
+│   ├── public/                     <span class="dim">#   static assets (data, report, this page)</span>
+│   └── scripts/                    <span class="dim">#   build + deploy scripts</span>
+│
+├── scripts/                        <span class="dim"># wrappers callable from repo root</span>
+│   ├── install.sh
+│   ├── dev.sh
+│   ├── build-firebase.sh
+│   ├── set-gemini-key.sh
+│   └── deploy-firebase.sh
+│
+└── eval/                           <span class="dim"># reproducible evaluation framework</span>
+    ├── preregistration.md          <span class="dim">#   frozen hypotheses + decision rules</span>
+    ├── rebuild_heldout.py          <span class="dim">#   step 6a</span>
+    ├── generate_questions.py       <span class="dim">#   step 6b</span>
+    ├── a1_index.py + a1_retrieve.py <span class="dim">#  step 6c (A1's plain-text RAG)</span>
+    ├── retrieve_py.py              <span class="dim">#   A3's subgraph retrieval (Python port of lib/graph/retrieve.ts)</span>
+    ├── arms.py                     <span class="dim">#   per-arm Claude CLI wrappers</span>
+    ├── run.py                      <span class="dim">#   step 7 — generation driver (resumable)</span>
+    ├── grade.py                    <span class="dim">#   step 8a — rule-based metrics</span>
+    ├── judge.py                    <span class="dim">#   step 8b — pairwise preference</span>
+    ├── judge_rubric.py             <span class="dim">#   step 8c — F/C/CS ratings</span>
+    ├── segment.py                  <span class="dim">#   step 8d — merged-claim hallucination</span>
+    ├── report.py                   <span class="dim">#   step 9  — generate report.html</span>
+    ├── questions.jsonl             <span class="dim">#   committed raw evidence</span>
+    ├── answers.jsonl, judgments.jsonl, scores.jsonl, rubric.jsonl, segments.jsonl
+    └── report.html, results.json
 </div>
-
-<h2 id="tree">7. File tree</h2>
-
-<pre>polygence-anesthesia-graphRAG/
-├── README.md                       Top-level docs (start here)
-├── CLAUDE.md                       Quick reference for AI coding assistants
-├── architecture.html               This page
-├── eval-explainer.html             Visual one-pager of the eval methodology
-├── firebase.json + .firebaserc     Firebase Hosting + Functions config
-│
-├── *.tsv                           Raw PharmGKB exports (chemicals/drugs/genes/
-│                                   phenotypes/clinicalVariants/relationships)
-├── preprocess/
-│   └── build_graph.py              TSV → graph.json + seed + search_index
-├── data/                           (gitignored — regenerable from the script)
-│   ├── graph.json                  Full graph (3,213 nodes / 8,024 edges)
-│   ├── seed_anesthesia.json        Demo subgraph (36 nodes / 62 edges)
-│   ├── search_index.json           Flat entity index
-│   └── *_heldout.json              Same artifacts minus the eval held-out rows
-│
-├── functions/
-│   ├── index.js                    Cloud Function /api/llm → Gemini
-│   └── package.json                Node 20, firebase-functions ^5
-│
-├── web/                            The Next.js 14 + TS app
-│   ├── app/
-│   │   ├── page.tsx                Home: three-pane layout
-│   │   ├── about/page.tsx          About + links
-│   │   └── api/{chat,explain,graph,search}/route.ts   Server build only
-│   ├── components/
-│   │   ├── GraphCanvas.tsx         Cytoscape (fcose) renderer
-│   │   ├── LeftSidebar.tsx         Search + filters + load
-│   │   ├── RightSidebar.tsx        Explain + Chat panels
-│   │   ├── ApiKeyModal.tsx         BYOK modal (static deploys)
-│   │   └── ui/{Button,Dialog,Input}.tsx   Radix primitives
-│   ├── lib/
-│   │   ├── graph/                  GraphRAG core (TS port lives in eval/ too)
-│   │   ├── llm/                    Provider abstraction (Claude CLI / OpenAI / browser)
-│   │   ├── api-key.ts              localStorage helpers for BYOK
-│   │   ├── store.ts                Zustand client store
-│   │   └── cn.ts                   className helper
-│   ├── public/
-│   │   ├── data/*.json             Copied from ../data at build:firebase time
-│   │   ├── eval-report.html        Copied from ../eval/report.html
-│   │   └── architecture.html       Copied from ../architecture.html
-│   ├── scripts/
-│   │   ├── build-firebase.mjs      Static export (stashes app/api during build)
-│   │   └── deploy-firebase.mjs     Hosting + Functions in one shot
-│   └── next.config.mjs             Conditional output:export when BYOK=1
-│
-├── scripts/                        Wrappers at repo root, runnable from anywhere
-│   ├── install.sh                  npm install in web/ + functions/
-│   ├── dev.sh                      Local Next.js (Claude CLI)
-│   ├── build-firebase.sh           Static build only
-│   ├── set-gemini-key.sh           Store GEMINI_KEY secret (one-time)
-│   └── deploy-firebase.sh          Build + deploy hosting + functions
-│
-└── eval/                           Reproducible evaluation framework
-    ├── README.md                   Reproducer
-    ├── preregistration.md          Frozen hypotheses + decision rules
-    ├── rebuild_heldout.py          30% deterministic split (seed=42)
-    ├── generate_questions.py       8-stratum templates → 187 questions
-    ├── retrieve_py.py              Faithful Python port of lib/graph/retrieve.ts
-    ├── a1_index.py + a1_retrieve.py  BM25+dense steelman for A1
-    ├── arms.py                     Per-arm Claude CLI wrappers
-    ├── run.py                      Driver: 3 arms × 187 Qs (resumable)
-    ├── grade.py                    Rule-based metrics
-    ├── judge.py                    Blinded pairwise preference (Haiku)
-    ├── judge_rubric.py             F/C/CS 1-5 ratings
-    ├── segment.py                  Merged-claim hallucination
-    ├── report.py                   eval/report.html generator
-    ├── questions.jsonl             187 questions + gold (committed)
-    ├── answers.jsonl               748 LLM responses (committed)
-    ├── judgments.jsonl             374 pairwise judgments
-    ├── scores.jsonl                Rule-based metrics
-    ├── rubric.jsonl                F/C/CS ratings
-    ├── segments.jsonl              Merged-claim records
-    └── report.html, results.json   Final outputs</pre>
-
-<h2 id="stack">8. Tech stack</h2>
-
-<table>
-  <thead><tr><th>Layer</th><th>Tools</th></tr></thead>
-  <tbody>
-    <tr><td><strong>Preprocessing</strong></td><td>Python 3 stdlib only (no pip deps) — <code>build_graph.py</code> is ~500 lines, hand-written parser</td></tr>
-    <tr><td><strong>Frontend</strong></td><td><span class="pill">Next.js 14</span> <span class="pill">TypeScript 5.5</span> <span class="pill">React 18</span> <span class="pill">Tailwind 3.4</span> <span class="pill">Cytoscape.js (fcose layout)</span> <span class="pill">Zustand 4</span> <span class="pill">Fuse.js</span> <span class="pill">Radix UI Dialog/Slot</span> <span class="pill">CVA</span> <span class="pill">lucide-react</span></td></tr>
-    <tr><td><strong>Backend (local)</strong></td><td>Next.js API routes · Node <code>child_process</code> spawning <code>claude -p</code></td></tr>
-    <tr><td><strong>Backend (deployed)</strong></td><td><span class="pill pill-good">Firebase Hosting</span> <span class="pill pill-good">Cloud Functions v2 (Node 20)</span> <span class="pill pill-good">Secret Manager (GEMINI_KEY)</span></td></tr>
-    <tr><td><strong>LLM providers</strong></td><td>Default Gemini 2.5 Flash via Cloud Function proxy; BYOK browser-side for OpenAI / Anthropic / Gemini / DeepSeek; Claude Code CLI for local dev</td></tr>
-    <tr><td><strong>Eval pipeline</strong></td><td>Python 3.12 · <code>rank_bm25</code> · <code>sentence-transformers</code> (all-MiniLM-L6-v2, local) · <code>rapidfuzz</code> · Claude CLI for generation and judging · stdlib for everything else</td></tr>
-    <tr><td><strong>Evaluation models</strong></td><td>Generator: Claude Sonnet 4 · Judge: Claude Haiku 4.5 (cross-size within Claude)</td></tr>
-  </tbody>
-</table>
 
 <footer>
-  Author: <strong>Mihika Pall</strong> · Polygence research mentorship program 2026 · Data: <a href="https://www.pharmgkb.org/" target="_blank">PharmGKB</a> · Code: <a href="https://github.com/mihikap01/polygence-anesthesia-graphRAG" target="_blank">github.com/mihikap01/polygence-anesthesia-graphRAG</a>
+  Author: <strong>Mihika Pall</strong> · Polygence research mentorship program (2026) ·
+  Data: <a href="https://www.pharmgkb.org/" target="_blank">PharmGKB</a> ·
+  Code: <a href="https://github.com/mihikap01/polygence-anesthesia-graphRAG" target="_blank">github.com/mihikap01/polygence-anesthesia-graphRAG</a>
 </footer>
 
 </div>
