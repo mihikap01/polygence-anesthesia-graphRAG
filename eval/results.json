@@ -1,6 +1,8 @@
 {
   "n_scores": 748,
   "n_judgments": 374,
+  "n_rubric": 445,
+  "n_segments": 57,
   "headline": {
     "A0": {
       "n_answers": 187,
@@ -407,6 +409,79 @@
         "ties": 0,
         "n": 12
       }
+    }
+  },
+  "rubric": {
+    "A0": {
+      "n": 111,
+      "F_mean": 3.4864864864864864,
+      "F_ci": 0.2506799483510825,
+      "C_mean": 3.4054054054054053,
+      "C_ci": 0.28642836552895207,
+      "CS_mean": 3.8468468468468466,
+      "CS_ci": 0.239555621290256
+    },
+    "A1": {
+      "n": 110,
+      "F_mean": 3.4272727272727272,
+      "F_ci": 0.28353883184441775,
+      "C_mean": 3.2636363636363637,
+      "C_ci": 0.30448200750716753,
+      "CS_mean": 3.7636363636363637,
+      "CS_ci": 0.2505032169512685
+    },
+    "A2": {
+      "n": 111,
+      "F_mean": 3.0720720720720722,
+      "F_ci": 0.24022911249139822,
+      "C_mean": 1.7297297297297298,
+      "C_ci": 0.2557508083944642,
+      "CS_mean": 3.135135135135135,
+      "CS_ci": 0.21357074467011972
+    },
+    "A3": {
+      "n": 113,
+      "F_mean": 3.0707964601769913,
+      "F_ci": 0.2817011133602144,
+      "C_mean": 3.0530973451327434,
+      "C_ci": 0.319206324465087,
+      "CS_mean": 3.398230088495575,
+      "CS_ci": 0.28043000891025865
+    }
+  },
+  "hallucination": {
+    "questions_covered": 57,
+    "A0": {
+      "claims_made": 463,
+      "supported": 343,
+      "unsupported": 15,
+      "unverifiable": 105,
+      "hallucination_rate": 0.032397408207343416,
+      "support_rate": 0.7408207343412527
+    },
+    "A1": {
+      "claims_made": 343,
+      "supported": 237,
+      "unsupported": 12,
+      "unverifiable": 94,
+      "hallucination_rate": 0.03498542274052478,
+      "support_rate": 0.6909620991253644
+    },
+    "A2": {
+      "claims_made": 207,
+      "supported": 114,
+      "unsupported": 21,
+      "unverifiable": 72,
+      "hallucination_rate": 0.10144927536231885,
+      "support_rate": 0.5507246376811594
+    },
+    "A3": {
+      "claims_made": 434,
+      "supported": 289,
+      "unsupported": 16,
+      "unverifiable": 129,
+      "hallucination_rate": 0.03686635944700461,
+      "support_rate": 0.6658986175115207
     }
   }
 }

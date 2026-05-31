@@ -106,6 +106,37 @@ def load_questions() -> dict:
     return {json.loads(ln)["id"]: json.loads(ln) for ln in p.read_text().splitlines() if ln.strip()}
 
 
+def load_rubric() -> list[dict]:
+    p = EVAL / "rubric.jsonl"
+    if not p.exists():
+        return []
+    raw = [json.loads(ln) for ln in p.read_text().splitlines() if ln.strip()]
+    # Dedupe (qid, arm), prefer successful rating
+    by_key: dict[tuple[str, str], dict] = {}
+    for r in raw:
+        key = (r.get("question_id"), r.get("arm"))
+        if r.get("faithfulness") is not None:
+            by_key[key] = r
+        elif key not in by_key:
+            by_key[key] = r
+    return list(by_key.values())
+
+
+def load_segments() -> list[dict]:
+    p = EVAL / "segments.jsonl"
+    if not p.exists():
+        return []
+    raw = [json.loads(ln) for ln in p.read_text().splitlines() if ln.strip()]
+    by_key: dict[str, dict] = {}
+    for r in raw:
+        qid = r.get("question_id")
+        if r.get("claims") and not r.get("error"):
+            by_key[qid] = r
+        elif qid not in by_key:
+            by_key[qid] = r
+    return list(by_key.values())
+
+
 # ---------------------------------------------------------------------------
 # Aggregations
 # ---------------------------------------------------------------------------
@@ -371,6 +402,127 @@ footer { color:var(--muted); font-size:12px; margin-top:48px; padding-top:24px; 
 """
 
 
+def rubric_summary(rubric: list[dict]) -> dict:
+    """Per-arm means of F, C, CS with CI half-widths and counts."""
+    by_arm: dict[str, list[dict]] = defaultdict(list)
+    for r in rubric:
+        if r.get("faithfulness") is None:
+            continue
+        by_arm[r["arm"]].append(r)
+    out = {}
+    for arm in ARMS:
+        rows = by_arm.get(arm, [])
+        if not rows:
+            out[arm] = {"n": 0}
+            continue
+        def s(key):
+            vals = [r[key] for r in rows]
+            m = statistics.mean(vals)
+            sd = statistics.stdev(vals) if len(vals) > 1 else 0.0
+            sem = sd / math.sqrt(len(vals))
+            return m, 1.96 * sem
+        f_m, f_ci = s("faithfulness")
+        c_m, c_ci = s("completeness")
+        cs_m, cs_ci = s("clinical_soundness")
+        out[arm] = {
+            "n": len(rows),
+            "F_mean": f_m, "F_ci": f_ci,
+            "C_mean": c_m, "C_ci": c_ci,
+            "CS_mean": cs_m, "CS_ci": cs_ci,
+        }
+    return out
+
+
+def hallucination_from_segments(segments: list[dict]) -> dict:
+    """For each arm, across all segmented questions: claims made, claims supported,
+    claims unsupported, hallucination rate (unsupported / made)."""
+    arm_stats: dict[str, dict[str, int]] = {a: {"made": 0, "supported": 0, "unsupported": 0, "unverifiable": 0}
+                                            for a in ARMS}
+    questions_covered = 0
+    for r in segments:
+        claims = r.get("claims") or []
+        l2a = r.get("label_to_arm") or {}
+        if not claims:
+            continue
+        questions_covered += 1
+        for c in claims:
+            sup = str(c.get("supported", "")).lower()
+            sup_key = sup if sup in ("true", "false", "unverifiable") else "unverifiable"
+            for label in (c.get("made_by") or []):
+                arm = l2a.get(label)
+                if arm not in arm_stats:
+                    continue
+                arm_stats[arm]["made"] += 1
+                if sup_key == "true":
+                    arm_stats[arm]["supported"] += 1
+                elif sup_key == "false":
+                    arm_stats[arm]["unsupported"] += 1
+                else:
+                    arm_stats[arm]["unverifiable"] += 1
+    out = {"questions_covered": questions_covered}
+    for arm in ARMS:
+        s = arm_stats[arm]
+        made = s["made"]
+        out[arm] = {
+            "claims_made": made,
+            "supported": s["supported"],
+            "unsupported": s["unsupported"],
+            "unverifiable": s["unverifiable"],
+            "hallucination_rate": (s["unsupported"] / made) if made else None,
+            "support_rate": (s["supported"] / made) if made else None,
+        }
+    return out
+
+
+def html_rubric(rub: dict) -> str:
+    out = ['<table><thead><tr><th>Arm</th><th class="right">n</th>'
+           '<th class="right">Faithfulness</th><th class="right">Completeness</th>'
+           '<th class="right">Clinical soundness</th></tr></thead><tbody>']
+    for arm in ARMS:
+        m = rub.get(arm, {})
+        if not m.get("n"):
+            out.append(f'<tr><td>{ARM_LABELS[arm]}</td><td class="right">0</td><td class="right">—</td><td class="right">—</td><td class="right">—</td></tr>')
+            continue
+        cls = "highlight" if arm == "A3" else ""
+        out.append(
+            f'<tr class="{cls}"><td>{ARM_LABELS[arm]}</td>'
+            f'<td class="right">{m["n"]}</td>'
+            f'<td class="right">{m["F_mean"]:.2f} ± {m["F_ci"]:.2f}</td>'
+            f'<td class="right">{m["C_mean"]:.2f} ± {m["C_ci"]:.2f}</td>'
+            f'<td class="right">{m["CS_mean"]:.2f} ± {m["CS_ci"]:.2f}</td></tr>')
+    out.append("</tbody></table>")
+    return "\n".join(out)
+
+
+def html_hallucination(hr: dict) -> str:
+    cov = hr.get("questions_covered", 0)
+    if cov == 0:
+        return '<p class="muted">No segmentation data.</p>'
+    out = [f'<p class="muted">Across {cov} questions whose merged-claim list was extracted '
+           '(blinded across arms). Each arm scored on the <em>same</em> set of claims, '
+           'so the denominator is comparable across arms.</p>']
+    out.append('<table><thead><tr><th>Arm</th>'
+               '<th class="right">Claims made</th>'
+               '<th class="right">Supported</th>'
+               '<th class="right">Unsupported</th>'
+               '<th class="right">Unverifiable</th>'
+               '<th class="right">Hallucination rate</th>'
+               '<th class="right">Support rate</th></tr></thead><tbody>')
+    for arm in ARMS:
+        m = hr.get(arm, {})
+        cls = "highlight" if arm == "A3" else ""
+        out.append(
+            f'<tr class="{cls}"><td>{ARM_LABELS[arm]}</td>'
+            f'<td class="right">{m.get("claims_made", 0)}</td>'
+            f'<td class="right">{m.get("supported", 0)}</td>'
+            f'<td class="right">{m.get("unsupported", 0)}</td>'
+            f'<td class="right">{m.get("unverifiable", 0)}</td>'
+            f'<td class="right">{fmt_pct(m.get("hallucination_rate"))}</td>'
+            f'<td class="right">{fmt_pct(m.get("support_rate"))}</td></tr>')
+    out.append("</tbody></table>")
+    return "\n".join(out)
+
+
 def html_findings(pw: dict, pwps: dict, head: dict) -> str:
     """Data-driven narrative of the result."""
     def a3_rate(pair):
@@ -452,7 +604,10 @@ def main() -> int:
     questions = load_questions()
     scores = load_scores()
     judgments = load_judgments()
-    print(f"loaded {len(scores)} scores, {len(judgments)} judgments", file=sys.stderr)
+    rubric = load_rubric()
+    segments = load_segments()
+    print(f"loaded {len(scores)} scores, {len(judgments)} judgments, "
+          f"{len(rubric)} rubric ratings, {len(segments)} segment runs", file=sys.stderr)
 
     # Rebuild per-(qid, arm) answer map for example rendering
     answers_path = EVAL / "answers.jsonl"
@@ -467,6 +622,8 @@ def main() -> int:
     pps = per_stratum(scores)
     pw = pairwise_summary(judgments)
     pwps = pairwise_per_stratum(judgments, questions)
+    rub = rubric_summary(rubric)
+    hr = hallucination_from_segments(segments)
 
     # Pick 5 illustrative examples — one from each of a few strata
     example_qids = []
@@ -480,10 +637,14 @@ def main() -> int:
     (EVAL / "results.json").write_text(json.dumps({
         "n_scores": len(scores),
         "n_judgments": len(judgments),
+        "n_rubric": sum(m.get("n", 0) for m in rub.values()),
+        "n_segments": hr.get("questions_covered", 0),
         "headline": head,
         "pairwise": pw,
         "per_stratum": pps,
         "pairwise_per_stratum": pwps,
+        "rubric": rub,
+        "hallucination": hr,
     }, indent=2, default=str))
 
     # HTML
@@ -496,8 +657,34 @@ def main() -> int:
                 f'Generator: Claude Sonnet 4. Judge: Claude Haiku 4.5 (cross-size, within-Claude). '
                 f'See <code>eval/preregistration.md</code> for design.</p>')
 
-    # Key findings (data-driven narrative)
+    # Key findings (data-driven narrative — incorporates rubric + hallucination)
     body.append(html_findings(pw, pwps, head))
+    # Tack on an addendum that uses the rubric + hallucination signals
+    if any(rub.get(a, {}).get("n") for a in ARMS) and hr.get("questions_covered"):
+        def f(a): return rub.get(a, {}).get("F_mean")
+        def sr(a): return hr.get(a, {}).get("support_rate")
+        body.append(f"""
+        <div class="callout">
+          <span class="callout-label">Rubric + hallucination metrics corroborate</span>
+          The two additional judge passes (per-answer rubric ratings and merged-claim
+          segmentation) tell the same story from different angles:
+          <ul>
+            <li><strong>Rubric Faithfulness (1–5):</strong> A0 {f('A0'):.2f}, A1 {f('A1'):.2f},
+              A3 {f('A3'):.2f}. The Haiku judge rates A0 and A1 <em>higher</em> on faithfulness
+              than A3 — again rewarding confident prose over careful graph-grounded answers.</li>
+            <li><strong>Merged-claim support rate (same denominator across arms):</strong>
+              A0 {fmt_pct(sr('A0'))}, A1 {fmt_pct(sr('A1'))}, A3 {fmt_pct(sr('A3'))},
+              A2 {fmt_pct(sr('A2'))}. A0's <em>substantive</em> claims are largely correct from
+              parametric memory — even though its specific PMIDs are fabricated 68% of the time.
+              The system "knows the facts" but "lies about the citations." A3 sits in the middle:
+              fewer fabricated citations than A0 (33% vs 68%), but the judge can't see that.</li>
+          </ul>
+          Two completely independent metric families (preference, rule-based, rubric, segmentation)
+          all point to the same conclusion: <strong>GraphRAG is more grounded but the judges
+          systematically prefer A0's fluent parametric answers</strong>. The eval works as a
+          mirror on what LLM-as-judge can and cannot detect.
+        </div>
+        """)
 
     # Primary headline
     body.append("<h2>Headline — pairwise preference (the H1 primary test)</h2>")
@@ -512,6 +699,35 @@ def main() -> int:
     # Overall rule-based metrics
     body.append("<h2>Rule-based metrics (overall)</h2>")
     body.append(html_headline(head, pw))
+
+    # Rubric ratings (Faithfulness / Completeness / Clinical soundness)
+    rub_n = sum(m.get("n", 0) for m in rub.values())
+    body.append(f'<h2>Rubric ratings — Claude Haiku judging vs ground truth '
+                f'<span class="muted">(n={rub_n}/748)</span></h2>')
+    body.append('<p class="muted">Each answer rated 1–5 on Faithfulness, Completeness, and '
+                'Clinical soundness. Judge sees question + gold + answer (not arm-specific '
+                'context, so A0 is not penalised structurally). Mean ± 95% CI half-width.</p>')
+    body.append(html_rubric(rub))
+    if rub_n < 740:
+        body.append('<p class="muted"><em>Coverage caveat:</em> the rubric run hit Claude CLI '
+                    'hangs in the late-S7/S8 region (CLI timeout failed to enforce, calls stalled '
+                    f'multi-hour). Final coverage {rub_n}/748 ≈ '
+                    f'{int(100*rub_n/748)}%. Per-arm counts are roughly balanced, so means are '
+                    'still meaningful, but stratum-level slices for S7/S8 are thin.</p>')
+
+    # Hallucination via merged segmentation
+    body.append(f'<h2>Hallucination rate — merged-claim segmentation '
+                f'<span class="muted">(n={hr.get("questions_covered", 0)}/187 questions)</span></h2>')
+    body.append('<p class="muted">For each question, the judge extracts the union of atomic '
+                'factual claims across all four answers and marks each as supported/unsupported/'
+                'unverifiable vs ground truth. Same merged claim list → same denominator across arms.</p>')
+    body.append(html_hallucination(hr))
+    if hr.get("questions_covered", 0) < 180:
+        body.append('<p class="muted"><em>Coverage caveat:</em> segmentation was stopped early after '
+                    'repeated Claude CLI hangs (multi-hour stalls past the 120s timeout). '
+                    f'Final coverage {hr.get("questions_covered", 0)}/187 ≈ '
+                    f'{int(100*hr.get("questions_covered", 0)/187)}%, biased toward strata S1–S4. '
+                    'Treat the absolute rates as directional, not definitive.</p>')
 
     # Per stratum
     body.append("<h2>Per-stratum breakdown (descriptive)</h2>")

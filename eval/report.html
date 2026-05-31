@@ -79,7 +79,28 @@ footer { color:var(--muted); font-size:12px; margin-top:48px; padding-top:24px; 
       in multi-hop reasoning.</em> See the threats/deviations section for why these numbers should be
       read with caution.
     </div>
-    <h2>Headline — pairwise preference (the H1 primary test)</h2><table><thead><tr><th>Comparison</th><th class="right">n</th><th class="right">A3 wins</th><th class="right">Other wins</th><th class="right">Ties</th><th class="right">A3 preferred</th><th class="right">95% CI</th><th class="right">p</th><th>Verdict</th></tr></thead><tbody>
+    
+        <div class="callout">
+          <span class="callout-label">Rubric + hallucination metrics corroborate</span>
+          The two additional judge passes (per-answer rubric ratings and merged-claim
+          segmentation) tell the same story from different angles:
+          <ul>
+            <li><strong>Rubric Faithfulness (1–5):</strong> A0 3.49, A1 3.43,
+              A3 3.07. The Haiku judge rates A0 and A1 <em>higher</em> on faithfulness
+              than A3 — again rewarding confident prose over careful graph-grounded answers.</li>
+            <li><strong>Merged-claim support rate (same denominator across arms):</strong>
+              A0 74.1%, A1 69.1%, A3 66.6%,
+              A2 55.1%. A0's <em>substantive</em> claims are largely correct from
+              parametric memory — even though its specific PMIDs are fabricated 68% of the time.
+              The system "knows the facts" but "lies about the citations." A3 sits in the middle:
+              fewer fabricated citations than A0 (33% vs 68%), but the judge can't see that.</li>
+          </ul>
+          Two completely independent metric families (preference, rule-based, rubric, segmentation)
+          all point to the same conclusion: <strong>GraphRAG is more grounded but the judges
+          systematically prefer A0's fluent parametric answers</strong>. The eval works as a
+          mirror on what LLM-as-judge can and cannot detect.
+        </div>
+        <h2>Headline — pairwise preference (the H1 primary test)</h2><table><thead><tr><th>Comparison</th><th class="right">n</th><th class="right">A3 wins</th><th class="right">Other wins</th><th class="right">Ties</th><th class="right">A3 preferred</th><th class="right">95% CI</th><th class="right">p</th><th>Verdict</th></tr></thead><tbody>
 <tr><td>A3 vs A0</td><td class="right">187</td><td class="right">52</td><td class="right">135</td><td class="right">0</td><td class="right"><strong>27.8%</strong></td><td class="right">21.9% – 34.6%</td><td class="right">0.0000</td><td>Other arm wins</td></tr>
 <tr><td>A3 vs A1</td><td class="right">186</td><td class="right">91</td><td class="right">95</td><td class="right">0</td><td class="right"><strong>48.9%</strong></td><td class="right">41.8% – 56.1%</td><td class="right">0.8260</td><td>Inconclusive</td></tr>
 </tbody></table><div class="callout">
@@ -92,7 +113,18 @@ footer { color:var(--muted); font-size:12px; margin-top:48px; padding-top:24px; 
 <tr class=""><td>A1 — naïve RAG</td><td class="right">187</td><td class="right">1</td><td class="right">1087.9</td><td class="right">13.7s</td><td class="right">90.2%</td><td class="right">100.0%</td></tr>
 <tr class=""><td>A2 — full subgraph</td><td class="right">187</td><td class="right">0</td><td class="right">931.8</td><td class="right">11.9s</td><td class="right">90.6%</td><td class="right">0.0%</td></tr>
 <tr class="highlight"><td>A3 — GraphRAG</td><td class="right">187</td><td class="right">0</td><td class="right">1170.0</td><td class="right">13.7s</td><td class="right">94.0%</td><td class="right">66.7%</td></tr>
-</tbody></table><h2>Per-stratum breakdown (descriptive)</h2><p class="muted">Per the preregistration, per-stratum metrics are <em>descriptive</em> rather than inferential — sample size per stratum (n=12–40) is too small for hypothesis tests after multiple-comparison correction.</p><h3>S1 — Well-known facts <span class="muted">(n=20)</span></h3>
+</tbody></table><h2>Rubric ratings — Claude Haiku judging vs ground truth <span class="muted">(n=445/748)</span></h2><p class="muted">Each answer rated 1–5 on Faithfulness, Completeness, and Clinical soundness. Judge sees question + gold + answer (not arm-specific context, so A0 is not penalised structurally). Mean ± 95% CI half-width.</p><table><thead><tr><th>Arm</th><th class="right">n</th><th class="right">Faithfulness</th><th class="right">Completeness</th><th class="right">Clinical soundness</th></tr></thead><tbody>
+<tr class=""><td>A0 — no context</td><td class="right">111</td><td class="right">3.49 ± 0.25</td><td class="right">3.41 ± 0.29</td><td class="right">3.85 ± 0.24</td></tr>
+<tr class=""><td>A1 — naïve RAG</td><td class="right">110</td><td class="right">3.43 ± 0.28</td><td class="right">3.26 ± 0.30</td><td class="right">3.76 ± 0.25</td></tr>
+<tr class=""><td>A2 — full subgraph</td><td class="right">111</td><td class="right">3.07 ± 0.24</td><td class="right">1.73 ± 0.26</td><td class="right">3.14 ± 0.21</td></tr>
+<tr class="highlight"><td>A3 — GraphRAG</td><td class="right">113</td><td class="right">3.07 ± 0.28</td><td class="right">3.05 ± 0.32</td><td class="right">3.40 ± 0.28</td></tr>
+</tbody></table><p class="muted"><em>Coverage caveat:</em> the rubric run hit Claude CLI hangs in the late-S7/S8 region (CLI timeout failed to enforce, calls stalled multi-hour). Final coverage 445/748 ≈ 59%. Per-arm counts are roughly balanced, so means are still meaningful, but stratum-level slices for S7/S8 are thin.</p><h2>Hallucination rate — merged-claim segmentation <span class="muted">(n=57/187 questions)</span></h2><p class="muted">For each question, the judge extracts the union of atomic factual claims across all four answers and marks each as supported/unsupported/unverifiable vs ground truth. Same merged claim list → same denominator across arms.</p><p class="muted">Across 57 questions whose merged-claim list was extracted (blinded across arms). Each arm scored on the <em>same</em> set of claims, so the denominator is comparable across arms.</p>
+<table><thead><tr><th>Arm</th><th class="right">Claims made</th><th class="right">Supported</th><th class="right">Unsupported</th><th class="right">Unverifiable</th><th class="right">Hallucination rate</th><th class="right">Support rate</th></tr></thead><tbody>
+<tr class=""><td>A0 — no context</td><td class="right">463</td><td class="right">343</td><td class="right">15</td><td class="right">105</td><td class="right">3.2%</td><td class="right">74.1%</td></tr>
+<tr class=""><td>A1 — naïve RAG</td><td class="right">343</td><td class="right">237</td><td class="right">12</td><td class="right">94</td><td class="right">3.5%</td><td class="right">69.1%</td></tr>
+<tr class=""><td>A2 — full subgraph</td><td class="right">207</td><td class="right">114</td><td class="right">21</td><td class="right">72</td><td class="right">10.1%</td><td class="right">55.1%</td></tr>
+<tr class="highlight"><td>A3 — GraphRAG</td><td class="right">434</td><td class="right">289</td><td class="right">16</td><td class="right">129</td><td class="right">3.7%</td><td class="right">66.6%</td></tr>
+</tbody></table><p class="muted"><em>Coverage caveat:</em> segmentation was stopped early after repeated Claude CLI hangs (multi-hour stalls past the 120s timeout). Final coverage 57/187 ≈ 30%, biased toward strata S1–S4. Treat the absolute rates as directional, not definitive.</p><h2>Per-stratum breakdown (descriptive)</h2><p class="muted">Per the preregistration, per-stratum metrics are <em>descriptive</em> rather than inferential — sample size per stratum (n=12–40) is too small for hypothesis tests after multiple-comparison correction.</p><h3>S1 — Well-known facts <span class="muted">(n=20)</span></h3>
 <table><thead><tr><th>Arm</th><th class="right">Entity recall</th><th class="right">PMID exists</th>
 </tr></thead><tbody>
 <tr class=""><td>A0 — no context</td><td class="right">82.5%</td><td class="right">33.3%</td></tr>

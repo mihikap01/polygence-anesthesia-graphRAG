@@ -33,4 +33,3 @@ silent-spaces/
 # Eval — keep results + raw evidence committed; ignore only heavy/derived caches
 eval/.cache/
 eval/__pycache__/
-eval/segments.jsonl
