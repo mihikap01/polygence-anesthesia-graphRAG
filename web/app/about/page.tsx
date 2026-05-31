@@ -73,6 +73,36 @@ export default function AboutPage() {
         />
       </section>
 
+      {/* Eval report — prominent link */}
+      <section className="mx-auto max-w-3xl px-6 pb-16">
+        <a
+          href="/eval-report"
+          className="block rounded-3xl border border-border bg-card p-7 shadow-soft hover:shadow-gentle transition-shadow"
+        >
+          <div className="flex items-start gap-4">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+              <ShieldCheck size={18} />
+            </span>
+            <div className="flex-1">
+              <div className="text-xs font-semibold uppercase tracking-wider text-primary mb-1">
+                Research report
+              </div>
+              <h3 className="text-base font-semibold text-foreground">
+                Does this graph layer actually help an LLM answer pharmacogenomics questions?
+              </h3>
+              <p className="mt-1.5 text-sm text-muted-foreground leading-relaxed">
+                A blinded evaluation of subgraph RAG against a strong plain-text retriever and a
+                no-context baseline. 187 held-out PharmGKB questions, four independent metric
+                families, honest discussion of limitations. Result: mixed.
+              </p>
+              <div className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-primary">
+                Read the report →
+              </div>
+            </div>
+          </div>
+        </a>
+      </section>
+
       {/* Founder — single short paragraph, inline */}
       <section className="mx-auto max-w-2xl px-6 pb-20 text-center">
         <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">

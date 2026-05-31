@@ -22,6 +22,13 @@ for (const f of ["graph.json", "seed_anesthesia.json", "search_index.json"]) {
   cpSync(join(dataSrc, f), join(dataDst, f));
 }
 
+// 1b. Copy the eval report so it's served at /eval-report.html. If the file
+// doesn't exist, skip silently — the demo still works without the report.
+const evalReport = join(root, "..", "eval", "report.html");
+if (existsSync(evalReport)) {
+  cpSync(evalReport, join(root, "public", "eval-report.html"));
+}
+
 // 2. Move API routes aside so Next doesn't try to prerender them.
 let stashed = false;
 if (existsSync(apiDir)) {
