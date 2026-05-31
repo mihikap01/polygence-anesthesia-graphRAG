@@ -94,6 +94,29 @@ details pre { font-size:12px; margin-top:10px; max-height:400px; overflow:auto; 
   display:flex; align-items:center; justify-content:center; }
 .flow-arrow { text-align:center; color:var(--muted); font-size:16px; line-height:1; }
 .metric-key { color:var(--primary); font-weight:600; }
+/* Appendix A — reproduction recipe styling */
+pre.cmd-app {
+  background: hsl(215 20% 18%); color: hsl(195 50% 94%);
+  border-radius: 10px; padding: 12px 16px; overflow-x: auto;
+  font-size: 13px; line-height: 1.55; margin: 10px 0;
+  white-space: pre; font-family: 'JetBrains Mono', ui-monospace, monospace;
+  box-shadow: var(--soft);
+}
+ul.meta-list { font-size: 13px; color: var(--muted); margin: 8px 0 18px; padding-left: 20px; }
+ul.meta-list li { margin: 4px 0; }
+ul.meta-list strong { color: var(--fg); }
+ul.meta-list code { background: var(--accent-bg); padding: 1px 5px; border-radius: 4px; }
+.metric-block {
+  background: var(--card); border: 1px solid var(--border); border-radius: 14px;
+  padding: 18px 22px; box-shadow: var(--soft); margin: 14px 0 22px;
+}
+.metric-block h4 {
+  font-size: 12px; text-transform: uppercase; letter-spacing: .06em;
+  color: var(--primary); margin: 14px 0 6px; font-weight: 600;
+}
+.metric-block h4:first-child { margin-top: 0; }
+.metric-block p { margin: 6px 0; font-size: 14px; }
+.metric-block ul { margin: 6px 0; padding-left: 22px; font-size: 14px; }
 footer { color:var(--muted); font-size:12px; margin-top:48px; padding-top:24px; border-top:1px solid var(--border); }
 @media (max-width:680px) {
   .arm-card-grid, .examples { grid-template-columns:1fr; }
@@ -836,4 +859,212 @@ Based on the knowledge graph context, **no formal PharmGKB clinical guidelines (
         denormalised knowledge graph (drug-drug interaction networks, citation graphs, gene-pathway
         networks) where multi-hop facts genuinely require traversal. This is the cleanest test of
         whether the negative result here generalises beyond PharmGKB.</li>
-    </ol><footer>Author: <strong>Mihika Pall</strong> · Polygence research mentorship program (2026). Generated from 748 scores and 374 judgments. Generator: Claude Sonnet 4 · Judge: Claude Haiku 4.5. Pre-registration: <code>eval/preregistration.md</code>. Source: <a href="https://github.com/mihikap01/polygence-anesthesia-graphRAG">github.com/mihikap01/polygence-anesthesia-graphRAG</a>.</footer></div></body></html>
+    </ol>
+    <span class="section-tag">appendix a</span>
+    <h2>Appendix A. How each metric works + how to reproduce every result</h2>
+    <p>This appendix is a run-along recipe. Each step shows: what you are computing,
+      why we use that metric, the exact command, the expected output, and a link to
+      the source file on GitHub. Following A.1 → A.7 in order recreates everything in §4.</p>
+
+    <h3 id="a-setup">A.1 — Setup (deterministic, no LLM cost)</h3>
+    <p>Three setup scripts. All deterministic with fixed seeds — running them again
+      produces byte-identical output.</p>
+
+    <h4>(a) Held-out split <span class="muted">— seed=42</span></h4>
+    <p>Drops 30% of the 1A/1B/2A/2B clinical-variant rows from the graph + from A1's
+      text-RAG index. Neither A1 nor A3 can "look up" those rows directly.</p>
+    <pre class="cmd-app">python3 eval/rebuild_heldout.py</pre>
+    <ul class="meta-list">
+      <li><strong>Source:</strong> <a href="https://github.com/mihikap01/polygence-anesthesia-graphRAG/blob/main/eval/rebuild_heldout.py">eval/rebuild_heldout.py</a></li>
+      <li><strong>Produces:</strong> <code>eval/heldout_variant_hashes.txt</code> · <code>eval/heldout_variants.tsv</code> (120 rows) · <code>data/graph_heldout.json</code> (3,203 nodes / 7,972 edges)</li>
+      <li><strong>Time:</strong> ~3 seconds</li>
+    </ul>
+
+    <h4>(b) Question generation <span class="muted">— seed=7</span></h4>
+    <p>187 questions across 8 strata, each carrying a gold record (entities,
+      evidence level, valid PMIDs, refusal flag).</p>
+    <pre class="cmd-app">python3 eval/generate_questions.py</pre>
+    <ul class="meta-list">
+      <li><strong>Source:</strong> <a href="https://github.com/mihikap01/polygence-anesthesia-graphRAG/blob/main/eval/generate_questions.py">eval/generate_questions.py</a></li>
+      <li><strong>Produces:</strong> <code>eval/questions.jsonl</code> (187 records)</li>
+      <li><strong>Time:</strong> ~3 seconds</li>
+    </ul>
+
+    <h4>(c) A1's plain-text RAG index <span class="muted">— BM25 + dense, local CPU</span></h4>
+    <pre class="cmd-app">python3 eval/a1_index.py</pre>
+    <ul class="meta-list">
+      <li><strong>Source:</strong> <a href="https://github.com/mihikap01/polygence-anesthesia-graphRAG/blob/main/eval/a1_index.py">eval/a1_index.py</a> (indexing) · <a href="https://github.com/mihikap01/polygence-anesthesia-graphRAG/blob/main/eval/a1_retrieve.py">eval/a1_retrieve.py</a> (query-time top-K)</li>
+      <li><strong>Produces:</strong> <code>eval/.cache/</code> with BM25 pickle + dense embeddings (sentence-transformers/all-MiniLM-L6-v2) + chunks JSON</li>
+      <li><strong>Time:</strong> ~20 seconds (first run downloads ~80MB embedder weights)</li>
+    </ul>
+
+    <h3 id="a-gen">A.2 — Generation (the 3 arms × 187 = 561 LLM calls)</h3>
+    <p>For each question, runs three arms in turn via the Claude CLI. Same system
+      prompt across all arms — the <em>only</em> variable is the context block.</p>
+    <pre class="cmd-app">python3 eval/run.py --model sonnet</pre>
+    <ul class="meta-list">
+      <li><strong>Source:</strong> <a href="https://github.com/mihikap01/polygence-anesthesia-graphRAG/blob/main/eval/run.py">eval/run.py</a> (driver, resumable) · <a href="https://github.com/mihikap01/polygence-anesthesia-graphRAG/blob/main/eval/arms.py">eval/arms.py</a> (per-arm CLI wrappers) · <a href="https://github.com/mihikap01/polygence-anesthesia-graphRAG/blob/main/eval/retrieve_py.py">eval/retrieve_py.py</a> (A3's entity-link + neighborhood + paths)</li>
+      <li><strong>Produces:</strong> <code>eval/answers.jsonl</code> (561+ records, ~970 KB)</li>
+      <li><strong>Time:</strong> ~3–4 hours (rate limits can extend this)</li>
+      <li><strong>Cost:</strong> ~$25 in Claude API spend</li>
+      <li><strong>Resumable:</strong> re-running the same command skips already-completed (question, arm) pairs.</li>
+    </ul>
+
+    <h3 id="a-rule">A.3 — Metric family 1: rule-based (deterministic, judge-independent)</h3>
+
+    <div class="metric-block">
+      <h4>What it measures</h4>
+      <p>Hard, verifiable facts about each answer:</p>
+      <ul>
+        <li><strong>PMID exists rate</strong> — of cited PMIDs, the fraction that actually appear in
+          our corpus (<code>relationships.tsv</code> + PubMed). Detects citation fabrication.</li>
+        <li><strong>Entity precision / recall</strong> — of the gold entities (genes, drugs,
+          phenotypes) for the question, how many appear in the answer.</li>
+        <li><strong>Evidence-level exact match</strong> — (S2 stratum only) does the claimed
+          evidence level (1A / 1B / 2A / 2B / 3 / 4) match the gold level?</li>
+        <li><strong>Refusal correctness</strong> — (S6 negative-control + S7 OOD strata only)
+          did the arm refuse / say "no association" when it should have?</li>
+      </ul>
+      <h4>Why we use it</h4>
+      <p>This is the only metric family that is <em>judge-independent</em>. It cannot be biased
+        by which model the judge prefers. If the LLM judge and the deterministic checks disagree,
+        the deterministic check is the ground truth signal.</p>
+      <h4>Run it</h4>
+      <pre class="cmd-app">python3 eval/grade.py</pre>
+      <ul class="meta-list">
+        <li><strong>Source:</strong> <a href="https://github.com/mihikap01/polygence-anesthesia-graphRAG/blob/main/eval/grade.py">eval/grade.py</a></li>
+        <li><strong>Produces:</strong> <code>eval/scores.jsonl</code> (one record per (question, arm))</li>
+        <li><strong>Time:</strong> ~3 seconds · <strong>Cost:</strong> $0 (no LLM calls)</li>
+        <li><strong>Where it shows up in the report:</strong> §4.2 Table 5 (overall) and §4.5 Table 8 (per-stratum)</li>
+      </ul>
+    </div>
+
+    <h3 id="a-pairwise">A.4 — Metric family 2: blinded pairwise preference (the H1 primary test)</h3>
+
+    <div class="metric-block">
+      <h4>What it measures</h4>
+      <p>For each question, Claude Haiku 4.5 sees two answers (e.g. A3 and A1) with arm labels
+        stripped and presentation order randomised, then picks the preferred answer or "tie."
+        We run two pairs per question: <code>A3 vs A1</code> (primary, 187 comparisons) and
+        <code>A3 vs A0</code> (secondary, 187 comparisons), for 374 total.</p>
+      <h4>Why we use it</h4>
+      <p>Pairwise comparison is the most defensible form of LLM-as-judge — it requires less
+        anchoring than 1–5 absolute ratings and is robust to scale-use bias. With n=187 the
+        sign-test has &gt;0.95 power to detect a 55% preference rate at α=0.05. This is the
+        <em>only</em> adequately powered hypothesis test in the design.</p>
+      <h4>How H1 is decided</h4>
+      <p>Pre-registered threshold (frozen before any LLM calls): A3 wins H1 if A3 is preferred
+        on &gt;55% of decisive comparisons with sign-test p&lt;0.05.</p>
+      <h4>Run it</h4>
+      <pre class="cmd-app">python3 eval/judge.py --workers 6 --model haiku</pre>
+      <ul class="meta-list">
+        <li><strong>Source:</strong> <a href="https://github.com/mihikap01/polygence-anesthesia-graphRAG/blob/main/eval/judge.py">eval/judge.py</a></li>
+        <li><strong>Produces:</strong> <code>eval/judgments.jsonl</code> (374 comparisons)</li>
+        <li><strong>Time:</strong> ~20 minutes at 6 parallel workers · <strong>Cost:</strong> ~$7</li>
+        <li><strong>Where it shows up in the report:</strong> §4.1 Table 4 (the headline)</li>
+      </ul>
+    </div>
+
+    <h3 id="a-rubric">A.5 — Metric family 3: anchored 1–5 rubric ratings</h3>
+
+    <div class="metric-block">
+      <h4>What it measures</h4>
+      <p>Per answer, Claude Haiku rates three dimensions on a 1–5 scale anchored to verbal
+        descriptions:</p>
+      <ul>
+        <li><strong>Faithfulness (1–5)</strong> — does every factual claim match ground truth?
+          5 = all claims supported · 3 = some wrong/unverifiable · 1 = many fabricated</li>
+        <li><strong>Completeness (1–5)</strong> — does the answer cover the gold entities and
+          relationships? 5 = covers gold + sensible elaboration · 1 = misses the central fact</li>
+        <li><strong>Clinical soundness (1–5)</strong> — would a pharmacist call this misleading
+          or unsafe? 5 = clinically appropriate, well hedged · 1 = misleading / unsafe</li>
+      </ul>
+      <p>Crucially, the judge sees question + gold + answer — <em>not</em> arm-specific
+        retrieved context. This avoids penalising A0 (no context) by construction.</p>
+      <h4>Why we use it</h4>
+      <p>Captures softer qualities (clinical caution, completeness) that the rule-based pass
+        can't. Less powerful than pairwise but gives anchored absolute scores.</p>
+      <h4>Run it</h4>
+      <pre class="cmd-app">python3 eval/judge_rubric.py --workers 8 --model haiku</pre>
+      <ul class="meta-list">
+        <li><strong>Source:</strong> <a href="https://github.com/mihikap01/polygence-anesthesia-graphRAG/blob/main/eval/judge_rubric.py">eval/judge_rubric.py</a></li>
+        <li><strong>Produces:</strong> <code>eval/rubric.jsonl</code> (one record per (question, arm))</li>
+        <li><strong>Time:</strong> ~30 minutes at 8 parallel workers · <strong>Cost:</strong> ~$9</li>
+        <li><strong>Where it shows up in the report:</strong> §4.3 Table 6</li>
+      </ul>
+    </div>
+
+    <h3 id="a-halluc">A.6 — Metric family 4: merged-claim hallucination rate</h3>
+
+    <div class="metric-block">
+      <h4>What it measures</h4>
+      <p>Per question, Haiku extracts the union of atomic factual claims across all 4 answers
+        (with arm labels stripped), then labels each claim as supported / unsupported /
+        unverifiable against ground truth. For each arm we count: how many of those claims did
+        the arm make, and how many were supported.</p>
+      <p><strong>Hallucination rate</strong> = (unsupported claims the arm made) / (total
+        claims the arm made). Same merged claim list → same denominator across arms, which
+        makes the comparison fair (the previous version used per-arm segmentation, which gave
+        terse arms a structural advantage).</p>
+      <h4>Why we use it</h4>
+      <p>Pairwise preference can't see fabrication; the judge prefers fluent confidence.
+        This metric exposes per-arm fabrication rate with a fair denominator. It is the only
+        cross-arm-comparable hallucination measure.</p>
+      <h4>Run it</h4>
+      <pre class="cmd-app">python3 eval/segment.py --workers 4 --model haiku</pre>
+      <ul class="meta-list">
+        <li><strong>Source:</strong> <a href="https://github.com/mihikap01/polygence-anesthesia-graphRAG/blob/main/eval/segment.py">eval/segment.py</a></li>
+        <li><strong>Produces:</strong> <code>eval/segments.jsonl</code> (one record per question)</li>
+        <li><strong>Time:</strong> ~40 minutes at 4 parallel workers · <strong>Cost:</strong> ~$3</li>
+        <li><strong>Where it shows up in the report:</strong> §4.4 Table 7</li>
+        <li><strong>Known limitation:</strong> the Claude CLI sometimes hangs past its 120s
+          timeout. Coverage on the original run was 57/187 (~31%) before being stopped; treat
+          absolute rates as directional, not definitive.</li>
+      </ul>
+    </div>
+
+    <h3 id="a-report">A.7 — Aggregate everything into the report</h3>
+    <p>Reads all four <code>*.jsonl</code> outputs, computes the headline tables, generates this
+      HTML report and a machine-readable <code>results.json</code>.</p>
+    <pre class="cmd-app">python3 eval/report.py
+open eval/report.html</pre>
+    <ul class="meta-list">
+      <li><strong>Source:</strong> <a href="https://github.com/mihikap01/polygence-anesthesia-graphRAG/blob/main/eval/report.py">eval/report.py</a></li>
+      <li><strong>Produces:</strong> <code>eval/report.html</code> · <code>eval/results.json</code></li>
+      <li><strong>Time:</strong> ~1 second · <strong>Cost:</strong> $0</li>
+    </ul>
+
+    <h3 id="a-code">A.8 — Full eval source code reference</h3>
+    <p>Every file involved in the evaluation, with GitHub links:</p>
+    <table>
+      <thead><tr><th>File</th><th>Role</th></tr></thead>
+      <tbody>
+        <tr><td><a href="https://github.com/mihikap01/polygence-anesthesia-graphRAG/blob/main/eval/preregistration.md">eval/preregistration.md</a></td><td>Frozen hypotheses + decision rules + A1 spec (committed before any LLM calls)</td></tr>
+        <tr><td><a href="https://github.com/mihikap01/polygence-anesthesia-graphRAG/blob/main/eval/README.md">eval/README.md</a></td><td>Reproducer + status table</td></tr>
+        <tr><td><a href="https://github.com/mihikap01/polygence-anesthesia-graphRAG/blob/main/eval/rebuild_heldout.py">eval/rebuild_heldout.py</a></td><td>A.1(a) — Deterministic 30% held-out split (seed=42)</td></tr>
+        <tr><td><a href="https://github.com/mihikap01/polygence-anesthesia-graphRAG/blob/main/eval/generate_questions.py">eval/generate_questions.py</a></td><td>A.1(b) — 8 stratum templates → 187 questions (seed=7)</td></tr>
+        <tr><td><a href="https://github.com/mihikap01/polygence-anesthesia-graphRAG/blob/main/eval/a1_index.py">eval/a1_index.py</a></td><td>A.1(c) — Build BM25 + dense index over TSVs</td></tr>
+        <tr><td><a href="https://github.com/mihikap01/polygence-anesthesia-graphRAG/blob/main/eval/a1_retrieve.py">eval/a1_retrieve.py</a></td><td>A.2 — A1's query-time top-K retrieval with RRF</td></tr>
+        <tr><td><a href="https://github.com/mihikap01/polygence-anesthesia-graphRAG/blob/main/eval/retrieve_py.py">eval/retrieve_py.py</a></td><td>A.2 — A3's entity-link + 1-hop neighbourhoods + BFS shortest paths (Python port of <a href="https://github.com/mihikap01/polygence-anesthesia-graphRAG/blob/main/web/lib/graph/retrieve.ts">web/lib/graph/retrieve.ts</a>)</td></tr>
+        <tr><td><a href="https://github.com/mihikap01/polygence-anesthesia-graphRAG/blob/main/eval/arms.py">eval/arms.py</a></td><td>A.2 — Per-arm Claude CLI wrappers + shared system prompt</td></tr>
+        <tr><td><a href="https://github.com/mihikap01/polygence-anesthesia-graphRAG/blob/main/eval/run.py">eval/run.py</a></td><td>A.2 — Generation driver (resumable)</td></tr>
+        <tr><td><a href="https://github.com/mihikap01/polygence-anesthesia-graphRAG/blob/main/eval/grade.py">eval/grade.py</a></td><td>A.3 — Rule-based metrics</td></tr>
+        <tr><td><a href="https://github.com/mihikap01/polygence-anesthesia-graphRAG/blob/main/eval/judge.py">eval/judge.py</a></td><td>A.4 — Blinded pairwise preference (parallel workers)</td></tr>
+        <tr><td><a href="https://github.com/mihikap01/polygence-anesthesia-graphRAG/blob/main/eval/judge_rubric.py">eval/judge_rubric.py</a></td><td>A.5 — F/C/CS 1–5 ratings (parallel workers)</td></tr>
+        <tr><td><a href="https://github.com/mihikap01/polygence-anesthesia-graphRAG/blob/main/eval/segment.py">eval/segment.py</a></td><td>A.6 — Merged-claim hallucination (parallel workers)</td></tr>
+        <tr><td><a href="https://github.com/mihikap01/polygence-anesthesia-graphRAG/blob/main/eval/report.py">eval/report.py</a></td><td>A.7 — Aggregate + generate this report</td></tr>
+        <tr><td><a href="https://github.com/mihikap01/polygence-anesthesia-graphRAG/blob/main/eval/questions.jsonl">eval/questions.jsonl</a></td><td>Committed: 187 questions + gold records</td></tr>
+        <tr><td><a href="https://github.com/mihikap01/polygence-anesthesia-graphRAG/blob/main/eval/answers.jsonl">eval/answers.jsonl</a></td><td>Committed: 561+ raw LLM responses</td></tr>
+        <tr><td><a href="https://github.com/mihikap01/polygence-anesthesia-graphRAG/blob/main/eval/judgments.jsonl">eval/judgments.jsonl</a></td><td>Committed: 374 pairwise judgments</td></tr>
+        <tr><td><a href="https://github.com/mihikap01/polygence-anesthesia-graphRAG/blob/main/eval/scores.jsonl">eval/scores.jsonl</a></td><td>Committed: per-(question, arm) rule-based scores</td></tr>
+        <tr><td><a href="https://github.com/mihikap01/polygence-anesthesia-graphRAG/blob/main/eval/rubric.jsonl">eval/rubric.jsonl</a></td><td>Committed: per-answer F/C/CS ratings</td></tr>
+        <tr><td><a href="https://github.com/mihikap01/polygence-anesthesia-graphRAG/blob/main/eval/segments.jsonl">eval/segments.jsonl</a></td><td>Committed: per-question merged-claim records</td></tr>
+        <tr><td><a href="https://github.com/mihikap01/polygence-anesthesia-graphRAG/blob/main/eval/results.json">eval/results.json</a></td><td>Machine-readable summary of all metrics</td></tr>
+      </tbody>
+    </table>
+
+    <p style="margin-top:14px; font-size:13px;" class="muted">
+      <strong>Total reproduction cost:</strong> ~5 hours wall time, ~$45 in Claude API spend.
+      Every output file is also committed under <a href="https://github.com/mihikap01/polygence-anesthesia-graphRAG/blob/main/eval/">eval/</a> so you can read
+      the raw evidence without re-running anything.
+    </p><footer>Author: <strong>Mihika Pall</strong> · Polygence research mentorship program (2026). Generated from 748 scores and 374 judgments. Generator: Claude Sonnet 4 · Judge: Claude Haiku 4.5. Pre-registration: <code>eval/preregistration.md</code>. Source: <a href="https://github.com/mihikap01/polygence-anesthesia-graphRAG">github.com/mihikap01/polygence-anesthesia-graphRAG</a>.</footer></div></body></html>
