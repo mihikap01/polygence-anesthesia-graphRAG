@@ -110,6 +110,34 @@
     overflow-x: auto;
   }
   .diagram pre { background: transparent; border: none; box-shadow: none; padding: 0; margin: 0; font-size: 12.5px; color: var(--fg); }
+
+  /* SVG diagram styling (replaces ASCII-art with proper boxes + arrows) */
+  .svg-diagram { width: 100%; height: auto; display: block; margin: 0 auto; }
+  .svg-source-fill   { fill: hsl(40 70% 96%); }
+  .svg-source-stroke { stroke: hsl(40 60% 55%); stroke-width: 1.5; }
+  .svg-code-fill     { fill: hsl(195 50% 96%); }
+  .svg-code-stroke   { stroke: hsl(195 35% 45%); stroke-width: 1.5; }
+  .svg-data-fill     { fill: hsl(265 35% 96%); }
+  .svg-data-stroke   { stroke: hsl(265 30% 58%); stroke-width: 1.5; }
+  .svg-app-fill      { fill: hsl(150 40% 95%); }
+  .svg-app-stroke    { stroke: hsl(150 35% 42%); stroke-width: 1.5; }
+  .svg-infra-fill    { fill: hsl(215 25% 95%); }
+  .svg-infra-stroke  { stroke: hsl(215 20% 50%); stroke-width: 1.5; }
+  .svg-accent-fill   { fill: hsl(10 60% 96%); }
+  .svg-accent-stroke { stroke: hsl(10 55% 55%); stroke-width: 1.5; }
+  .svg-title  { font: 600 13px Inter, sans-serif; fill: hsl(215 20% 18%); }
+  .svg-sub    { font: 400 11px Inter, sans-serif; fill: hsl(215 15% 35%); }
+  .svg-cap    { font: 400 10px Inter, sans-serif; fill: hsl(215 15% 45%); }
+  .svg-step-num { font: 700 12px Inter, sans-serif; fill: #fff; }
+  .svg-line   { stroke: hsl(215 15% 45%); stroke-width: 1.8; fill: none; }
+  .svg-line-dashed { stroke: hsl(215 15% 55%); stroke-width: 1.2; fill: none; stroke-dasharray: 4 3; }
+  .svg-bus    { stroke: hsl(215 15% 60%); stroke-width: 1.5; fill: none; }
+  /* Drop-shadow filter applied via filter attr on rects */
+
+  .legend { display:flex; flex-wrap:wrap; gap:14px; margin: 6px 0 18px; font-size: 12px; color: var(--muted); }
+  .legend-item { display:inline-flex; align-items:center; gap:6px; }
+  .legend-swatch { width:14px; height:10px; border-radius:3px; display:inline-block; }
+
   @media (max-width: 700px) { .grid-2 { grid-template-columns: 1fr; } .toc ol { column-count: 1; } }
 </style>
 </head>
@@ -149,43 +177,86 @@
 
 <h2 id="sys">1. System overview</h2>
 
+<div class="legend">
+  <span class="legend-item"><span class="legend-swatch" style="background:hsl(40 70% 88%);border:1.5px solid hsl(40 60% 55%);"></span> Source data</span>
+  <span class="legend-item"><span class="legend-swatch" style="background:hsl(195 50% 90%);border:1.5px solid hsl(195 35% 45%);"></span> Code / scripts</span>
+  <span class="legend-item"><span class="legend-swatch" style="background:hsl(265 35% 90%);border:1.5px solid hsl(265 30% 58%);"></span> Generated artifacts</span>
+  <span class="legend-item"><span class="legend-swatch" style="background:hsl(150 40% 88%);border:1.5px solid hsl(150 35% 42%);"></span> Consumer applications</span>
+  <span class="legend-item"><span class="legend-swatch" style="background:hsl(215 25% 90%);border:1.5px solid hsl(215 20% 50%);"></span> Infrastructure</span>
+</div>
+
 <div class="diagram">
-<pre>
-                                   ┌───────────────────────────┐
-                                   │  PharmGKB source TSVs     │
-                                   │  • clinicalVariants.tsv   │   raw curated data
-                                   │  • relationships.tsv      │   (5.2k + 127k rows)
-                                   │  • drugs / genes / phens  │
-                                   └─────────────┬─────────────┘
-                                                 │
-                                                 ▼
-                                   ┌───────────────────────────┐
-                                   │  preprocess/build_graph.py │   Python stdlib, no deps
-                                   │  • parse + normalise IDs   │   produces 3,213 nodes
-                                   │  • collapse rsIDs → clusters│  / 8,024 edges
-                                   │  • inject drug-class layer │
-                                   └─────────────┬─────────────┘
-                                                 │
-                                ┌────────────────┼─────────────────┐
-                                ▼                ▼                 ▼
-                       data/graph.json   data/seed_anesthesia.json data/search_index.json
-                                                │
-                ┌───────────────────────────────┼──────────────────────────────┐
-                ▼                                                              ▼
-   ┌────────────────────────────────┐                       ┌──────────────────────────────────┐
-   │  WEB APP (Next.js 14)          │                       │  EVAL FRAMEWORK (Python)         │
-   │  ─────────────────             │                       │  ───────────────────             │
-   │  • Cytoscape graph canvas      │                       │  • rebuild_heldout.py (split)    │
-   │  • LeftSidebar — search/filter │                       │  • generate_questions.py (187)   │
-   │  • RightSidebar — Explain/Chat │                       │  • arms.py — A0/A1/A3 wrappers   │
-   │  • API routes (server build)   │                       │  • run.py — 4 × 187 generations  │
-   │  • Static export (BYOK)        │                       │  • grade.py — rule-based metrics │
-   │                                │                       │  • judge.py — pairwise preference│
-   │  Deployed: Firebase Hosting    │                       │  • judge_rubric.py — F/C/CS 1-5  │
-   │  Live: *.web.app               │                       │  • segment.py — hallucination    │
-   └────────────────────────────────┘                       │  • report.py — eval-report.html  │
-                                                            └──────────────────────────────────┘
-</pre>
+<svg viewBox="0 0 900 510" class="svg-diagram" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <filter id="dropshadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-opacity="0.10"/>
+    </filter>
+    <marker id="arrowhead" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="hsl(215 15% 45%)"/>
+    </marker>
+  </defs>
+
+  <!-- Layer 1: Source TSVs -->
+  <rect class="svg-source-fill svg-source-stroke" x="80" y="15" width="740" height="80" rx="14" filter="url(#dropshadow)"/>
+  <text class="svg-title" x="450" y="42" text-anchor="middle">PharmGKB source data</text>
+  <text class="svg-sub" x="450" y="62" text-anchor="middle">clinicalVariants.tsv · relationships.tsv · drugs.tsv · genes.tsv · phenotypes.tsv · chemicals.tsv</text>
+  <text class="svg-cap" x="450" y="80" text-anchor="middle">6 files · ~160k rows total · curated, evidence-graded</text>
+
+  <!-- Arrow down -->
+  <line class="svg-line" x1="450" y1="95" x2="450" y2="120" marker-end="url(#arrowhead)"/>
+
+  <!-- Layer 2: Build script -->
+  <rect class="svg-code-fill svg-code-stroke" x="290" y="125" width="320" height="80" rx="14" filter="url(#dropshadow)"/>
+  <text class="svg-title" x="450" y="152" text-anchor="middle">preprocess/build_graph.py</text>
+  <text class="svg-sub" x="450" y="172" text-anchor="middle">Python 3 stdlib only · ~500 lines</text>
+  <text class="svg-cap" x="450" y="190" text-anchor="middle">parse · normalise IDs · collapse rsIDs · inject drug-class</text>
+
+  <!-- Bus down + fan-out to 3 artifacts -->
+  <line class="svg-line" x1="450" y1="205" x2="450" y2="220"/>
+  <line class="svg-bus" x1="200" y1="220" x2="700" y2="220"/>
+  <line class="svg-line" x1="200" y1="220" x2="200" y2="240" marker-end="url(#arrowhead)"/>
+  <line class="svg-line" x1="450" y1="220" x2="450" y2="240" marker-end="url(#arrowhead)"/>
+  <line class="svg-line" x1="700" y1="220" x2="700" y2="240" marker-end="url(#arrowhead)"/>
+
+  <!-- Layer 3: Generated artifacts -->
+  <rect class="svg-data-fill svg-data-stroke" x="80" y="245" width="240" height="72" rx="12" filter="url(#dropshadow)"/>
+  <text class="svg-title" x="200" y="270" text-anchor="middle">data/graph.json</text>
+  <text class="svg-sub" x="200" y="288" text-anchor="middle">3,213 nodes · 8,024 edges</text>
+  <text class="svg-cap" x="200" y="304" text-anchor="middle">~2 MB</text>
+
+  <rect class="svg-data-fill svg-data-stroke" x="330" y="245" width="240" height="72" rx="12" filter="url(#dropshadow)"/>
+  <text class="svg-title" x="450" y="270" text-anchor="middle">data/seed_anesthesia.json</text>
+  <text class="svg-sub" x="450" y="288" text-anchor="middle">36 nodes (MH demo subgraph)</text>
+  <text class="svg-cap" x="450" y="304" text-anchor="middle">~28 KB</text>
+
+  <rect class="svg-data-fill svg-data-stroke" x="580" y="245" width="240" height="72" rx="12" filter="url(#dropshadow)"/>
+  <text class="svg-title" x="700" y="270" text-anchor="middle">data/search_index.json</text>
+  <text class="svg-sub" x="700" y="288" text-anchor="middle">Flat entity index</text>
+  <text class="svg-cap" x="700" y="304" text-anchor="middle">~302 KB</text>
+
+  <!-- Bus down + branches to two consumers -->
+  <line class="svg-line" x1="200" y1="317" x2="200" y2="335"/>
+  <line class="svg-line" x1="450" y1="317" x2="450" y2="335"/>
+  <line class="svg-line" x1="700" y1="317" x2="700" y2="335"/>
+  <line class="svg-bus" x1="200" y1="335" x2="700" y2="335"/>
+  <line class="svg-line" x1="290" y1="335" x2="290" y2="358" marker-end="url(#arrowhead)"/>
+  <line class="svg-line" x1="650" y1="335" x2="650" y2="358" marker-end="url(#arrowhead)"/>
+
+  <!-- Layer 4: Consumers -->
+  <rect class="svg-app-fill svg-app-stroke" x="80" y="360" width="420" height="130" rx="14" filter="url(#dropshadow)"/>
+  <text class="svg-title" x="290" y="385" text-anchor="middle">Web app · Next.js 14</text>
+  <text class="svg-sub" x="290" y="406" text-anchor="middle">Cytoscape graph canvas · Explain &amp; Chat panels</text>
+  <text class="svg-sub" x="290" y="422" text-anchor="middle">Server API routes + static export</text>
+  <text class="svg-cap" x="290" y="448" text-anchor="middle">Local: claude-cli  ·  Deployed: Firebase Hosting</text>
+  <text class="svg-cap" x="290" y="465" text-anchor="middle">polygence-pubmed-graphrag.web.app</text>
+
+  <rect class="svg-app-fill svg-app-stroke" x="500" y="360" width="320" height="130" rx="14" filter="url(#dropshadow)"/>
+  <text class="svg-title" x="660" y="385" text-anchor="middle">Eval framework · Python</text>
+  <text class="svg-sub" x="660" y="406" text-anchor="middle">3 arms × 187 questions</text>
+  <text class="svg-sub" x="660" y="422" text-anchor="middle">4 independent metric families</text>
+  <text class="svg-cap" x="660" y="448" text-anchor="middle">All scripts deterministic, resumable</text>
+  <text class="svg-cap" x="660" y="465" text-anchor="middle">Report: /eval-report</text>
+</svg>
 </div>
 
 <h2 id="pipe">2. Data pipeline</h2>
@@ -271,44 +342,137 @@ python3 preprocess/build_graph.py
 <p>An end-to-end Python pipeline under <code>eval/</code>. Every step is deterministic (fixed seeds), resumable, and reproducible from the committed scripts + raw evidence.</p>
 
 <div class="diagram">
-<pre>
-   1. SPLIT                         2. QUESTION SET                      3. INDEXES
-   ────────────                     ───────────────                      ──────────
-   rebuild_heldout.py               generate_questions.py                a1_index.py
-   30% of 1A/1B/2A/2B rows held    187 questions across 8 strata        BM25 + MiniLM dense
-   out (seed=42)                    (seed=7) with gold records           over reduced TSVs
+<svg viewBox="0 0 900 720" class="svg-diagram" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <filter id="dropshadow2" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-opacity="0.10"/>
+    </filter>
+    <marker id="arrowhead2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="hsl(215 15% 45%)"/>
+    </marker>
+  </defs>
 
-                                    │
-                                    ▼
-                       ┌──────────────────────────────────────┐
-                       │  4. GENERATION  (run.py + arms.py)   │
-                       │  3 arms × 187 Qs = 561 generations   │
-                       │  All via `claude -p --model sonnet`  │
-                       │                                       │
-                       │  A0 — no context                      │
-                       │  A1 — top-8 RRF-fused chunks          │
-                       │  A3 — entity-link + neighbourhoods    │
-                       │       + BFS shortest paths            │
-                       │       (retrieve_py.py = Python port   │
-                       │        of web/lib/graph/retrieve.ts)  │
-                       └─────────────────┬────────────────────┘
-                                         │
-        ┌─────────────────┬──────────────┼─────────────────┬──────────────────┐
-        ▼                 ▼              ▼                 ▼                  ▼
-   grade.py            judge.py     judge_rubric.py    segment.py        (audit)
-   ─────────           ────────     ──────────────     ──────────
-   Rule-based:         Pairwise     1-5 anchored       Merged-claim
-   PMID-exists,        preference   rubric ratings:    extraction
-   entity recall,      A3 vs A1,    Faithfulness,      → support
-   evidence-level      A3 vs A0     Completeness,      vs ground
-   exact-match,        (Haiku,      Clinical-          truth → per-arm
-   refusal correctness blinded)     soundness          hallucination rate
+  <!-- Row 1: Setup steps (3 boxes side by side) -->
+  <text class="svg-cap" x="30" y="14" font-weight="600" fill="hsl(215 15% 45%)">SETUP (deterministic, fixed seeds)</text>
 
-                                         │
-                                         ▼
-                              report.py → eval/report.html
-                              + eval/results.json (machine-readable)
-</pre>
+  <rect class="svg-code-fill svg-code-stroke" x="30" y="25" width="270" height="100" rx="12" filter="url(#dropshadow2)"/>
+  <text class="svg-title" x="165" y="50" text-anchor="middle">1. Held-out split</text>
+  <text class="svg-sub" x="165" y="68" text-anchor="middle">rebuild_heldout.py</text>
+  <text class="svg-cap" x="165" y="86" text-anchor="middle">30% of 1A/1B/2A/2B rows</text>
+  <text class="svg-cap" x="165" y="100" text-anchor="middle">held out (seed=42)</text>
+  <text class="svg-cap" x="165" y="116" text-anchor="middle">→ data/graph_heldout.json</text>
+
+  <rect class="svg-code-fill svg-code-stroke" x="315" y="25" width="270" height="100" rx="12" filter="url(#dropshadow2)"/>
+  <text class="svg-title" x="450" y="50" text-anchor="middle">2. Question generation</text>
+  <text class="svg-sub" x="450" y="68" text-anchor="middle">generate_questions.py</text>
+  <text class="svg-cap" x="450" y="86" text-anchor="middle">187 Qs across 8 strata</text>
+  <text class="svg-cap" x="450" y="100" text-anchor="middle">templates per stratum (seed=7)</text>
+  <text class="svg-cap" x="450" y="116" text-anchor="middle">→ questions.jsonl (with gold)</text>
+
+  <rect class="svg-code-fill svg-code-stroke" x="600" y="25" width="270" height="100" rx="12" filter="url(#dropshadow2)"/>
+  <text class="svg-title" x="735" y="50" text-anchor="middle">3. A1 RAG index</text>
+  <text class="svg-sub" x="735" y="68" text-anchor="middle">a1_index.py</text>
+  <text class="svg-cap" x="735" y="86" text-anchor="middle">BM25 + MiniLM dense</text>
+  <text class="svg-cap" x="735" y="100" text-anchor="middle">over reduced TSVs</text>
+  <text class="svg-cap" x="735" y="116" text-anchor="middle">→ .cache/ (~20s, local)</text>
+
+  <!-- Converging bus → generation -->
+  <line class="svg-line" x1="165" y1="125" x2="165" y2="155"/>
+  <line class="svg-line" x1="450" y1="125" x2="450" y2="155"/>
+  <line class="svg-line" x1="735" y1="125" x2="735" y2="155"/>
+  <line class="svg-bus" x1="165" y1="155" x2="735" y2="155"/>
+  <line class="svg-line" x1="450" y1="155" x2="450" y2="180" marker-end="url(#arrowhead2)"/>
+
+  <!-- GENERATION block (large) -->
+  <text class="svg-cap" x="30" y="174" font-weight="600" fill="hsl(215 15% 45%)">GENERATION (~3-4 h on Claude Sonnet, ~$25, resumable)</text>
+  <rect class="svg-accent-fill svg-accent-stroke" x="60" y="185" width="780" height="190" rx="14" filter="url(#dropshadow2)"/>
+  <text class="svg-title" x="450" y="212" text-anchor="middle">4. run.py + arms.py — generate 3 × 187 = 561 answers</text>
+  <text class="svg-sub" x="450" y="232" text-anchor="middle">All via `claude -p --model sonnet` · same system prompt across arms</text>
+
+  <!-- Three sub-arms inside -->
+  <rect class="svg-code-fill svg-code-stroke" x="90" y="250" width="230" height="110" rx="10"/>
+  <text class="svg-title" x="205" y="272" text-anchor="middle">A0 · LLM alone</text>
+  <text class="svg-sub" x="205" y="290" text-anchor="middle">No retrieved context</text>
+  <text class="svg-cap" x="205" y="312" text-anchor="middle">tests parametric</text>
+  <text class="svg-cap" x="205" y="326" text-anchor="middle">knowledge baseline</text>
+  <text class="svg-cap" x="205" y="345" text-anchor="middle" font-family="JetBrains Mono, monospace">→ arms.py: run_a0()</text>
+
+  <rect class="svg-code-fill svg-code-stroke" x="335" y="250" width="230" height="110" rx="10"/>
+  <text class="svg-title" x="450" y="272" text-anchor="middle">A1 · plain-text RAG</text>
+  <text class="svg-sub" x="450" y="290" text-anchor="middle">BM25 + dense, RRF, top-8</text>
+  <text class="svg-cap" x="450" y="312" text-anchor="middle">isolates what retrieval</text>
+  <text class="svg-cap" x="450" y="326" text-anchor="middle">alone provides</text>
+  <text class="svg-cap" x="450" y="345" text-anchor="middle" font-family="JetBrains Mono, monospace">→ a1_retrieve.py</text>
+
+  <rect class="svg-app-fill svg-app-stroke" x="580" y="250" width="230" height="110" rx="10"/>
+  <text class="svg-title" x="695" y="272" text-anchor="middle">A3 · subgraph RAG</text>
+  <text class="svg-sub" x="695" y="290" text-anchor="middle">Entity-link + 1-hop nbhd</text>
+  <text class="svg-cap" x="695" y="306" text-anchor="middle">+ BFS shortest paths</text>
+  <text class="svg-cap" x="695" y="325" text-anchor="middle">tests graph structure value</text>
+  <text class="svg-cap" x="695" y="345" text-anchor="middle" font-family="JetBrains Mono, monospace">→ retrieve_py.py</text>
+
+  <!-- Arrow down to scoring -->
+  <line class="svg-line" x1="450" y1="375" x2="450" y2="395"/>
+  <line class="svg-bus" x1="120" y1="395" x2="780" y2="395"/>
+  <line class="svg-line" x1="120" y1="395" x2="120" y2="420" marker-end="url(#arrowhead2)"/>
+  <line class="svg-line" x1="340" y1="395" x2="340" y2="420" marker-end="url(#arrowhead2)"/>
+  <line class="svg-line" x1="560" y1="395" x2="560" y2="420" marker-end="url(#arrowhead2)"/>
+  <line class="svg-line" x1="780" y1="395" x2="780" y2="420" marker-end="url(#arrowhead2)"/>
+
+  <!-- Scoring row: 4 boxes -->
+  <text class="svg-cap" x="30" y="414" font-weight="600" fill="hsl(215 15% 45%)">SCORING (four independent metric families)</text>
+
+  <rect class="svg-data-fill svg-data-stroke" x="30" y="425" width="180" height="130" rx="12" filter="url(#dropshadow2)"/>
+  <text class="svg-title" x="120" y="450" text-anchor="middle">grade.py</text>
+  <text class="svg-sub" x="120" y="468" text-anchor="middle">Rule-based (Python)</text>
+  <text class="svg-cap" x="120" y="488" text-anchor="middle">PMID-exists</text>
+  <text class="svg-cap" x="120" y="502" text-anchor="middle">entity precision/recall</text>
+  <text class="svg-cap" x="120" y="516" text-anchor="middle">evidence-level match</text>
+  <text class="svg-cap" x="120" y="530" text-anchor="middle">refusal correctness</text>
+  <text class="svg-cap" x="120" y="547" text-anchor="middle" font-style="italic">deterministic, no LLM</text>
+
+  <rect class="svg-data-fill svg-data-stroke" x="250" y="425" width="180" height="130" rx="12" filter="url(#dropshadow2)"/>
+  <text class="svg-title" x="340" y="450" text-anchor="middle">judge.py</text>
+  <text class="svg-sub" x="340" y="468" text-anchor="middle">Pairwise preference</text>
+  <text class="svg-cap" x="340" y="488" text-anchor="middle">A3 vs A1 (PRIMARY)</text>
+  <text class="svg-cap" x="340" y="502" text-anchor="middle">A3 vs A0 (secondary)</text>
+  <text class="svg-cap" x="340" y="516" text-anchor="middle">blinded, order randomised</text>
+  <text class="svg-cap" x="340" y="530" text-anchor="middle">374 comparisons</text>
+  <text class="svg-cap" x="340" y="547" text-anchor="middle" font-style="italic">Haiku judge, parallel</text>
+
+  <rect class="svg-data-fill svg-data-stroke" x="470" y="425" width="180" height="130" rx="12" filter="url(#dropshadow2)"/>
+  <text class="svg-title" x="560" y="450" text-anchor="middle">judge_rubric.py</text>
+  <text class="svg-sub" x="560" y="468" text-anchor="middle">Anchored 1–5 rubric</text>
+  <text class="svg-cap" x="560" y="488" text-anchor="middle">Faithfulness</text>
+  <text class="svg-cap" x="560" y="502" text-anchor="middle">Completeness</text>
+  <text class="svg-cap" x="560" y="516" text-anchor="middle">Clinical soundness</text>
+  <text class="svg-cap" x="560" y="530" text-anchor="middle">vs ground truth</text>
+  <text class="svg-cap" x="560" y="547" text-anchor="middle" font-style="italic">Haiku judge, parallel</text>
+
+  <rect class="svg-data-fill svg-data-stroke" x="690" y="425" width="180" height="130" rx="12" filter="url(#dropshadow2)"/>
+  <text class="svg-title" x="780" y="450" text-anchor="middle">segment.py</text>
+  <text class="svg-sub" x="780" y="468" text-anchor="middle">Merged-claim</text>
+  <text class="svg-cap" x="780" y="488" text-anchor="middle">extract union of claims</text>
+  <text class="svg-cap" x="780" y="502" text-anchor="middle">across all 4 arms</text>
+  <text class="svg-cap" x="780" y="516" text-anchor="middle">label each: supported /</text>
+  <text class="svg-cap" x="780" y="530" text-anchor="middle">unsupported / unverifiable</text>
+  <text class="svg-cap" x="780" y="547" text-anchor="middle" font-style="italic">→ hallucination rate</text>
+
+  <!-- Bus converging back to report -->
+  <line class="svg-line" x1="120" y1="555" x2="120" y2="585"/>
+  <line class="svg-line" x1="340" y1="555" x2="340" y2="585"/>
+  <line class="svg-line" x1="560" y1="555" x2="560" y2="585"/>
+  <line class="svg-line" x1="780" y1="555" x2="780" y2="585"/>
+  <line class="svg-bus" x1="120" y1="585" x2="780" y2="585"/>
+  <line class="svg-line" x1="450" y1="585" x2="450" y2="610" marker-end="url(#arrowhead2)"/>
+
+  <!-- Report block -->
+  <rect class="svg-app-fill svg-app-stroke" x="240" y="615" width="420" height="90" rx="14" filter="url(#dropshadow2)"/>
+  <text class="svg-title" x="450" y="640" text-anchor="middle">report.py — aggregate everything</text>
+  <text class="svg-sub" x="450" y="660" text-anchor="middle">eval/report.html (human-readable)</text>
+  <text class="svg-cap" x="450" y="680" text-anchor="middle">eval/results.json (machine-readable)</text>
+  <text class="svg-cap" x="450" y="695" text-anchor="middle">→ deployed at /eval-report</text>
+</svg>
 </div>
 
 <table>
@@ -332,55 +496,97 @@ python3 preprocess/build_graph.py
 <p>To make the abstraction concrete, here's what happens when a user asks <em>"Why is sevoflurane risky for malignant hyperthermia?"</em> on the live web app:</p>
 
 <div class="diagram">
-<pre>
-1. Browser (RightSidebar Chat panel)
-   user types question → fetch POST /api/llm   (BYOK build via Firebase rewrite)
+<svg viewBox="0 0 900 760" class="svg-diagram" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <filter id="dropshadow3" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-opacity="0.10"/>
+    </filter>
+    <marker id="arrowhead3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="hsl(215 15% 45%)"/>
+    </marker>
+  </defs>
 
-2. Firebase Hosting (firebase.json rewrite)
-   /api/llm → Cloud Function `ask` (us-central1)
+  <!-- Step 1: Browser → user types question -->
+  <circle cx="55" cy="50" r="18" fill="hsl(195 35% 42%)"/>
+  <text class="svg-step-num" x="55" y="55" text-anchor="middle">1</text>
+  <rect class="svg-app-fill svg-app-stroke" x="90" y="20" width="780" height="60" rx="12" filter="url(#dropshadow3)"/>
+  <text class="svg-title" x="110" y="44">Browser — RightSidebar Chat panel</text>
+  <text class="svg-sub" x="110" y="64">User types: <tspan font-style="italic">"Why is sevoflurane risky for malignant hyperthermia?"</tspan></text>
 
-3. Browser-side retrieval — BEFORE the POST, runs lib/graph/retrieve.ts:
-   ┌──────────────────────────────────────────────────────────┐
-   │ a) link_entities(question, graph)                         │
-   │    → fuzzy match against 3,213 nodes via Fuse.js          │
-   │    → finds: sevoflurane (drug), Malignant Hyperthermia    │
-   │      (phenotype), isoflurane (drug, fuzzy-match noise)    │
-   │                                                            │
-   │ b) For each linked entity: neighborhood(graph, [id], 1)    │
-   │    → BFS over adjacency list, 1 hop                        │
-   │    → ~22 edges connecting them to RYR1, succinylcholine,  │
-   │      Volatile Anesthetics class, etc.                      │
-   │                                                            │
-   │ c) shortest_path between every pair of linked entities     │
-   │    → BFS, max 4 hops, preferring CRITICAL / L1A edges      │
-   │    → 3 paths surfaced                                      │
-   │                                                            │
-   │ d) Render as structured text:                              │
-   │    ENTITIES IDENTIFIED:                                    │
-   │      • sevoflurane (drug) — matched "sevoflurane"          │
-   │      • Malignant Hyperthermia (phenotype) — ...            │
-   │    DIRECT NEIGHBOURHOOD OF sevoflurane:                    │
-   │      - sevoflurane --is linked to risk of[L1A, CRITICAL]   │
-   │        --&gt; RYR1                                           │
-   │      - sevoflurane --can trigger[L1A]--&gt; MH               │
-   │      - sevoflurane --belongs to drug class--&gt; Volatile... │
-   │    SHORTEST REASONING PATHS:                               │
-   │      sevoflurane → RYR1 → MH (2 hops, CRITICAL)            │
-   └──────────────────────────────────────────────────────────┘
+  <line class="svg-line" x1="465" y1="80" x2="465" y2="105" marker-end="url(#arrowhead3)"/>
 
-4. POST /api/llm with {systemPrompt, userPrompt} where userPrompt =
-   structured context block + the original question.
+  <!-- Step 2: Client-side retrieval (the GraphRAG core) -->
+  <circle cx="55" cy="160" r="18" fill="hsl(195 35% 42%)"/>
+  <text class="svg-step-num" x="55" y="165" text-anchor="middle">2</text>
+  <rect class="svg-app-fill svg-app-stroke" x="90" y="110" width="780" height="280" rx="12" filter="url(#dropshadow3)"/>
+  <text class="svg-title" x="110" y="134">Browser-side GraphRAG retrieval — lib/graph/retrieve.ts</text>
+  <text class="svg-sub" x="110" y="152">(runs in the browser before any network call; same logic ported to Python in eval/retrieve_py.py)</text>
 
-5. Cloud Function (functions/index.js)
-   • Origin check (only *.web.app + localhost allowed)
-   • Per-IP rate limit (in-memory, 20/min/instance)
-   • Forwards to api.deepseek.com or generativelanguage.googleapis.com
-     with the secret key
+  <!-- 4 sub-steps inside the box -->
+  <rect class="svg-code-fill svg-code-stroke" x="110" y="166" width="370" height="100" rx="10"/>
+  <text class="svg-title" x="125" y="186">a) link_entities(question, graph)</text>
+  <text class="svg-cap" x="125" y="206">→ fuzzy-match question n-grams vs 3,213 nodes</text>
+  <text class="svg-cap" x="125" y="222">  (Fuse.js, threshold 0.18)</text>
+  <text class="svg-cap" x="125" y="240">finds: sevoflurane (drug),</text>
+  <text class="svg-cap" x="125" y="256">       Malignant Hyperthermia (phenotype)</text>
 
-6. Response flows back through the Cloud Function → browser
-   • RightSidebar renders the answer with PMIDs as link chips
-   • "Context sent to model" panel shows the exact prompt for inspection
-</pre>
+  <rect class="svg-code-fill svg-code-stroke" x="490" y="166" width="370" height="100" rx="10"/>
+  <text class="svg-title" x="505" y="186">b) neighborhood(graph, [id], hops=1)</text>
+  <text class="svg-cap" x="505" y="206">→ BFS over adjacency list, 1 hop</text>
+  <text class="svg-cap" x="505" y="222">per linked entity</text>
+  <text class="svg-cap" x="505" y="240">→ ~22 edges to RYR1, succinylcholine,</text>
+  <text class="svg-cap" x="505" y="256">    Volatile Anesthetics class, etc.</text>
+
+  <rect class="svg-code-fill svg-code-stroke" x="110" y="275" width="370" height="100" rx="10"/>
+  <text class="svg-title" x="125" y="295">c) shortest_path(from, to, max=4)</text>
+  <text class="svg-cap" x="125" y="315">→ BFS between every pair of entities</text>
+  <text class="svg-cap" x="125" y="331">preferring CRITICAL / L1A edges</text>
+  <text class="svg-cap" x="125" y="349">→ 3 paths surfaced</text>
+  <text class="svg-cap" x="125" y="365">  (e.g. sevoflurane → RYR1 → MH, 2 hops)</text>
+
+  <rect class="svg-code-fill svg-code-stroke" x="490" y="275" width="370" height="100" rx="10"/>
+  <text class="svg-title" x="505" y="295">d) render_a3_context(...)</text>
+  <text class="svg-cap" x="505" y="315">→ structured text block with sections:</text>
+  <text class="svg-cap" x="505" y="331">  ENTITIES IDENTIFIED</text>
+  <text class="svg-cap" x="505" y="347">  DIRECT NEIGHBOURHOOD OF ...</text>
+  <text class="svg-cap" x="505" y="363">  SHORTEST REASONING PATHS</text>
+
+  <line class="svg-line" x1="465" y1="390" x2="465" y2="415" marker-end="url(#arrowhead3)"/>
+
+  <!-- Step 3: POST to /api/llm -->
+  <circle cx="55" cy="450" r="18" fill="hsl(195 35% 42%)"/>
+  <text class="svg-step-num" x="55" y="455" text-anchor="middle">3</text>
+  <rect class="svg-infra-fill svg-infra-stroke" x="90" y="420" width="780" height="60" rx="12" filter="url(#dropshadow3)"/>
+  <text class="svg-title" x="110" y="445">POST /api/llm  ·  {systemPrompt, userPrompt} where userPrompt = context block + question</text>
+  <text class="svg-sub" x="110" y="465">Firebase Hosting rewrites /api/llm → Cloud Function `ask` in us-central1</text>
+
+  <line class="svg-line" x1="465" y1="480" x2="465" y2="505" marker-end="url(#arrowhead3)"/>
+
+  <!-- Step 4: Cloud Function -->
+  <circle cx="55" cy="540" r="18" fill="hsl(195 35% 42%)"/>
+  <text class="svg-step-num" x="55" y="545" text-anchor="middle">4</text>
+  <rect class="svg-infra-fill svg-infra-stroke" x="90" y="510" width="780" height="80" rx="12" filter="url(#dropshadow3)"/>
+  <text class="svg-title" x="110" y="535">Cloud Function — functions/index.js</text>
+  <text class="svg-sub" x="110" y="555">Origin check (only *.web.app + localhost) · per-IP rate limit (20/min/instance)</text>
+  <text class="svg-cap" x="110" y="577">Reads GEMINI_KEY from Secret Manager · forwards to generativelanguage.googleapis.com</text>
+
+  <line class="svg-line" x1="465" y1="590" x2="465" y2="615" marker-end="url(#arrowhead3)"/>
+
+  <!-- Step 5: Gemini -->
+  <circle cx="55" cy="650" r="18" fill="hsl(195 35% 42%)"/>
+  <text class="svg-step-num" x="55" y="655" text-anchor="middle">5</text>
+  <rect class="svg-accent-fill svg-accent-stroke" x="90" y="620" width="780" height="60" rx="12" filter="url(#dropshadow3)"/>
+  <text class="svg-title" x="110" y="644">Gemini 2.5 Flash generates the answer</text>
+  <text class="svg-sub" x="110" y="664">Grounded in the structured GraphRAG context · cites PMIDs when available · refuses if context is empty</text>
+
+  <line class="svg-line" x1="465" y1="680" x2="465" y2="705" marker-end="url(#arrowhead3)"/>
+
+  <!-- Step 6: Response back to browser -->
+  <circle cx="55" cy="735" r="18" fill="hsl(195 35% 42%)"/>
+  <text class="svg-step-num" x="55" y="740" text-anchor="middle">6</text>
+  <rect class="svg-app-fill svg-app-stroke" x="90" y="710" width="780" height="46" rx="12" filter="url(#dropshadow3)"/>
+  <text class="svg-title" x="110" y="732">Response → RightSidebar: answer + PMID chips + "Context sent to model" panel (opens to show exact prompt)</text>
+</svg>
 </div>
 
 <h2 id="tree">7. File tree</h2>
