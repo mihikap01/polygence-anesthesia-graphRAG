@@ -139,6 +139,10 @@ ul.meta-list code { background: var(--accent-bg); padding: 1px 5px; border-radiu
 .metric-block h4:first-child { margin-top: 0; }
 .metric-block p { margin: 6px 0; font-size: 14px; }
 .metric-block ul { margin: 6px 0; padding-left: 22px; font-size: 14px; }
+.step-label {
+  font-size: 11px; text-transform: uppercase; letter-spacing: .07em;
+  color: var(--muted); font-weight: 600; margin: 14px 0 4px;
+}
 footer { color:var(--muted); font-size:12px; margin-top:48px; padding-top:24px; border-top:1px solid var(--border); }
 @media (max-width:680px) {
   .arm-card-grid, .examples { grid-template-columns:1fr; }
@@ -184,6 +188,7 @@ footer { color:var(--muted); font-size:12px; margin-top:48px; padding-top:24px; 
         <li><a href="#s7">7. Conclusions and future work</a></li>
         <li class="toc-appendix"><a href="#appendix-a"><strong>Appendix A. How each metric works + how to reproduce every result</strong></a>
           <ul>
+            <li><a href="#appendix-a"><strong>A.0 Quick start</strong></a> <span style="color: var(--primary);">(full pipeline, copy-paste)</span></li>
             <li><a href="#a-setup">A.1 Setup</a> · <a href="#a-gen">A.2 Generation</a></li>
             <li><a href="#a-rule">A.3 Rule-based</a> · <a href="#a-pairwise">A.4 Pairwise preference</a></li>
             <li><a href="#a-rubric">A.5 Rubric ratings</a> · <a href="#a-halluc">A.6 Hallucination</a></li>
@@ -909,10 +914,50 @@ Based on the knowledge graph context, **no formal PharmGKB clinical guidelines (
     </ol>
     <span class="section-tag">appendix a</span>
     <h2 id="appendix-a">Appendix A. How each metric works + how to reproduce every result</h2>
-    <p>This appendix is a run-along recipe. Each step shows: what you are computing,
-      why we use that metric, the exact command, the expected output, and a link to
-      the source file on GitHub. Following A.1 → A.7 in order recreates everything in §4.</p>
+    <p>This appendix is a run-along recipe — start from a clean repo clone and end with
+      the same <code>eval/report.html</code> that's published on this page. Every section shows
+      the <em>numbered steps</em> to run from the repo, the expected output, a one-line
+      verification command, and a link to the source file on GitHub.</p>
 
+    <!-- ============ A.0 QUICK START ============ -->
+    <div class="metric-block" style="border-color: hsl(195 35% 60%);">
+      <h4 style="color: var(--primary);">A.0 — Quick start: the entire pipeline from scratch</h4>
+      <p>If you just want a copy-paste recipe that runs the whole evaluation end-to-end:</p>
+      <pre class="cmd-app"># 1. Clone the repo
+git clone https://github.com/mihikap01/polygence-anesthesia-graphRAG
+cd polygence-anesthesia-graphRAG
+
+# 2. Install dependencies (web/ and functions/)
+scripts/install.sh
+
+# 3. (One-time) Build the source graph from PharmGKB TSVs
+python3 preprocess/build_graph.py
+
+# 4. SETUP — held-out split + 187 questions + A1 index   (§A.1, ~30 sec, $0)
+python3 eval/rebuild_heldout.py
+python3 eval/generate_questions.py
+python3 eval/a1_index.py
+
+# 5. GENERATION — 3 arms × 187 = 561 LLM calls           (§A.2, ~3-4 hr, ~$25, resumable)
+python3 eval/run.py --model sonnet
+
+# 6. SCORING — four independent metric families:
+python3 eval/grade.py                        # §A.3 rule-based      (~3 sec, $0)
+python3 eval/judge.py --workers 6            # §A.4 pairwise        (~20 min, ~$7)
+python3 eval/judge_rubric.py --workers 8     # §A.5 rubric F/C/CS   (~30 min, ~$9)
+python3 eval/segment.py --workers 4          # §A.6 hallucination   (~40 min, ~$3)
+
+# 7. AGGREGATE — produce eval/report.html and eval/results.json
+python3 eval/report.py                       # §A.7, ~1 sec, $0
+open eval/report.html</pre>
+      <p style="font-size:13px; color: var(--muted); margin-top:8px;">
+        <strong>Resumable:</strong> step 5 is the long one. If it's interrupted (rate limit,
+        CLI hang), just re-run the same command — completed (question, arm) pairs are skipped.
+        Steps 6a–d are independent and can be run in any order or in parallel.
+      </p>
+    </div>
+
+    <!-- ============ A.1 SETUP ============ -->
     <h3 id="a-setup">A.1 — Setup (deterministic, no LLM cost)</h3>
     <p>Three setup scripts. All deterministic with fixed seeds — running them again
       produces byte-identical output.</p>
@@ -920,41 +965,75 @@ Based on the knowledge graph context, **no formal PharmGKB clinical guidelines (
     <h4>(a) Held-out split <span class="muted">— seed=42</span></h4>
     <p>Drops 30% of the 1A/1B/2A/2B clinical-variant rows from the graph + from A1's
       text-RAG index. Neither A1 nor A3 can "look up" those rows directly.</p>
-    <pre class="cmd-app">python3 eval/rebuild_heldout.py</pre>
+    <p class="step-label">How to run, from the repo root:</p>
+    <pre class="cmd-app">cd polygence-anesthesia-graphRAG
+python3 eval/rebuild_heldout.py</pre>
+    <p class="step-label">Verify:</p>
+    <pre class="cmd-app">wc -l eval/heldout_variants.tsv      # → 121 (1 header + 120 rows)
+ls -l data/graph_heldout.json        # → file exists, ~2 MB</pre>
     <ul class="meta-list">
-      <li><strong>Source:</strong> <a href="https://github.com/mihikap01/polygence-anesthesia-graphRAG/blob/main/eval/rebuild_heldout.py">eval/rebuild_heldout.py</a></li>
-      <li><strong>Produces:</strong> <code>eval/heldout_variant_hashes.txt</code> · <code>eval/heldout_variants.tsv</code> (120 rows) · <code>data/graph_heldout.json</code> (3,203 nodes / 7,972 edges)</li>
-      <li><strong>Time:</strong> ~3 seconds</li>
+      <li><strong>Source on GitHub:</strong> <a href="https://github.com/mihikap01/polygence-anesthesia-graphRAG/blob/main/eval/rebuild_heldout.py">eval/rebuild_heldout.py</a> (which calls <a href="https://github.com/mihikap01/polygence-anesthesia-graphRAG/blob/main/preprocess/build_graph.py">preprocess/build_graph.py</a> with <code>HELDOUT_VARIANTS</code> set)</li>
+      <li><strong>Produces:</strong> <code>eval/heldout_variant_hashes.txt</code> · <code>eval/heldout_variants.tsv</code> (120 rows) · <code>data/graph_heldout.json</code> (3,203 nodes / 7,972 edges) · <code>data/search_index_heldout.json</code> · <code>data/seed_anesthesia_heldout.json</code></li>
+      <li><strong>Time:</strong> ~3 seconds · <strong>Cost:</strong> $0</li>
     </ul>
 
     <h4>(b) Question generation <span class="muted">— seed=7</span></h4>
-    <p>187 questions across 8 strata, each carrying a gold record (entities,
-      evidence level, valid PMIDs, refusal flag).</p>
+    <p>Templates over the held-out rows: 8 strata, 187 questions, each carrying a gold record
+      (entities, evidence level, valid PMIDs, refusal flag).</p>
+    <p class="step-label">How to run, from the repo root:</p>
     <pre class="cmd-app">python3 eval/generate_questions.py</pre>
+    <p class="step-label">Verify:</p>
+    <pre class="cmd-app">wc -l eval/questions.jsonl           # → 187
+python3 -c "import json; print(json.loads(open('eval/questions.jsonl').readline())['stratum'])"   # → S1</pre>
     <ul class="meta-list">
-      <li><strong>Source:</strong> <a href="https://github.com/mihikap01/polygence-anesthesia-graphRAG/blob/main/eval/generate_questions.py">eval/generate_questions.py</a></li>
+      <li><strong>Source on GitHub:</strong> <a href="https://github.com/mihikap01/polygence-anesthesia-graphRAG/blob/main/eval/generate_questions.py">eval/generate_questions.py</a></li>
       <li><strong>Produces:</strong> <code>eval/questions.jsonl</code> (187 records)</li>
-      <li><strong>Time:</strong> ~3 seconds</li>
+      <li><strong>Time:</strong> ~3 seconds · <strong>Cost:</strong> $0</li>
     </ul>
 
     <h4>(c) A1's plain-text RAG index <span class="muted">— BM25 + dense, local CPU</span></h4>
+    <p>Builds the index that A1 (the steelman plain-text baseline) will query at generation
+      time. First run downloads ~80 MB of <code>sentence-transformers/all-MiniLM-L6-v2</code>
+      weights to your <code>~/.cache/huggingface</code>.</p>
+    <p class="step-label">How to run, from the repo root:</p>
     <pre class="cmd-app">python3 eval/a1_index.py</pre>
+    <p class="step-label">Verify:</p>
+    <pre class="cmd-app">ls -la eval/.cache/                  # → a1_bm25.pkl + a1_chunks.json + a1_embeddings.npy</pre>
     <ul class="meta-list">
-      <li><strong>Source:</strong> <a href="https://github.com/mihikap01/polygence-anesthesia-graphRAG/blob/main/eval/a1_index.py">eval/a1_index.py</a> (indexing) · <a href="https://github.com/mihikap01/polygence-anesthesia-graphRAG/blob/main/eval/a1_retrieve.py">eval/a1_retrieve.py</a> (query-time top-K)</li>
-      <li><strong>Produces:</strong> <code>eval/.cache/</code> with BM25 pickle + dense embeddings (sentence-transformers/all-MiniLM-L6-v2) + chunks JSON</li>
-      <li><strong>Time:</strong> ~20 seconds (first run downloads ~80MB embedder weights)</li>
+      <li><strong>Source on GitHub:</strong> <a href="https://github.com/mihikap01/polygence-anesthesia-graphRAG/blob/main/eval/a1_index.py">eval/a1_index.py</a> (indexing) · <a href="https://github.com/mihikap01/polygence-anesthesia-graphRAG/blob/main/eval/a1_retrieve.py">eval/a1_retrieve.py</a> (query-time top-K with RRF fusion)</li>
+      <li><strong>Produces:</strong> <code>eval/.cache/</code> with BM25 pickle + dense embeddings + chunks JSON</li>
+      <li><strong>Time:</strong> ~20 seconds (after weight download) · <strong>Cost:</strong> $0</li>
     </ul>
 
+    <!-- ============ A.2 GENERATION ============ -->
     <h3 id="a-gen">A.2 — Generation (the 3 arms × 187 = 561 LLM calls)</h3>
     <p>For each question, runs three arms in turn via the Claude CLI. Same system
       prompt across all arms — the <em>only</em> variable is the context block.</p>
-    <pre class="cmd-app">python3 eval/run.py --model sonnet</pre>
+    <p class="step-label">Prerequisites:</p>
     <ul class="meta-list">
-      <li><strong>Source:</strong> <a href="https://github.com/mihikap01/polygence-anesthesia-graphRAG/blob/main/eval/run.py">eval/run.py</a> (driver, resumable) · <a href="https://github.com/mihikap01/polygence-anesthesia-graphRAG/blob/main/eval/arms.py">eval/arms.py</a> (per-arm CLI wrappers) · <a href="https://github.com/mihikap01/polygence-anesthesia-graphRAG/blob/main/eval/retrieve_py.py">eval/retrieve_py.py</a> (A3's entity-link + neighborhood + paths)</li>
+      <li>§A.1(a), (b), (c) all complete</li>
+      <li><code>claude</code> CLI installed and authenticated (<code>claude --version</code> works)</li>
+    </ul>
+    <p class="step-label">How to run, from the repo root:</p>
+    <pre class="cmd-app"># Standard run — Claude Sonnet 4 as generator
+python3 eval/run.py --model sonnet
+
+# Re-run is idempotent — completed (question, arm) pairs are skipped.
+# If interrupted, just re-issue the same command.</pre>
+    <p class="step-label">Verify (count unique successful answers):</p>
+    <pre class="cmd-app">python3 -c "
+import json
+seen = set()
+for line in open('eval/answers.jsonl'):
+    r = json.loads(line)
+    if not r.get('error'):
+        seen.add((r['question_id'], r['arm']))
+print(f'unique successful (qid, arm) pairs: {len(seen)}')   # → 560+"</pre>
+    <ul class="meta-list">
+      <li><strong>Source on GitHub:</strong> <a href="https://github.com/mihikap01/polygence-anesthesia-graphRAG/blob/main/eval/run.py">eval/run.py</a> (driver, resumable) · <a href="https://github.com/mihikap01/polygence-anesthesia-graphRAG/blob/main/eval/arms.py">eval/arms.py</a> (per-arm CLI wrappers + system prompt) · <a href="https://github.com/mihikap01/polygence-anesthesia-graphRAG/blob/main/eval/retrieve_py.py">eval/retrieve_py.py</a> (A3's subgraph retrieval, Python port of <a href="https://github.com/mihikap01/polygence-anesthesia-graphRAG/blob/main/web/lib/graph/retrieve.ts">web/lib/graph/retrieve.ts</a>)</li>
       <li><strong>Produces:</strong> <code>eval/answers.jsonl</code> (561+ records, ~970 KB)</li>
-      <li><strong>Time:</strong> ~3–4 hours (rate limits can extend this)</li>
-      <li><strong>Cost:</strong> ~$25 in Claude API spend</li>
-      <li><strong>Resumable:</strong> re-running the same command skips already-completed (question, arm) pairs.</li>
+      <li><strong>Time:</strong> ~3–4 hours · <strong>Cost:</strong> ~$25 in Claude API spend</li>
+      <li><strong>Resumable:</strong> ✓ — re-running skips done work</li>
     </ul>
 
     <h3 id="a-rule">A.3 — Metric family 1: rule-based (deterministic, judge-independent)</h3>
@@ -976,10 +1055,21 @@ Based on the knowledge graph context, **no formal PharmGKB clinical guidelines (
       <p>This is the only metric family that is <em>judge-independent</em>. It cannot be biased
         by which model the judge prefers. If the LLM judge and the deterministic checks disagree,
         the deterministic check is the ground truth signal.</p>
-      <h4>Run it</h4>
-      <pre class="cmd-app">python3 eval/grade.py</pre>
+      <h4>How to run from the repo</h4>
+      <p class="step-label">Prerequisites: §A.1 + §A.2 complete (<code>eval/answers.jsonl</code> exists with ≥ 560 successful records).</p>
+      <pre class="cmd-app"># From the repo root
+cd polygence-anesthesia-graphRAG
+
+# 1. Confirm the input is there
+wc -l eval/answers.jsonl              # → 561+ raw lines (some may be retry attempts)
+
+# 2. Run the grader (no LLM, just deterministic Python)
+python3 eval/grade.py
+
+# 3. Verify the output
+wc -l eval/scores.jsonl               # → 748 (the grader dedupes by (qid, arm))</pre>
       <ul class="meta-list">
-        <li><strong>Source:</strong> <a href="https://github.com/mihikap01/polygence-anesthesia-graphRAG/blob/main/eval/grade.py">eval/grade.py</a></li>
+        <li><strong>Source on GitHub:</strong> <a href="https://github.com/mihikap01/polygence-anesthesia-graphRAG/blob/main/eval/grade.py">eval/grade.py</a></li>
         <li><strong>Produces:</strong> <code>eval/scores.jsonl</code> (one record per (question, arm))</li>
         <li><strong>Time:</strong> ~3 seconds · <strong>Cost:</strong> $0 (no LLM calls)</li>
         <li><strong>Where it shows up in the report:</strong> §4.2 Table 5 (overall) and §4.5 Table 8 (per-stratum)</li>
@@ -1002,10 +1092,27 @@ Based on the knowledge graph context, **no formal PharmGKB clinical guidelines (
       <h4>How H1 is decided</h4>
       <p>Pre-registered threshold (frozen before any LLM calls): A3 wins H1 if A3 is preferred
         on &gt;55% of decisive comparisons with sign-test p&lt;0.05.</p>
-      <h4>Run it</h4>
-      <pre class="cmd-app">python3 eval/judge.py --workers 6 --model haiku</pre>
+      <h4>How to run from the repo</h4>
+      <p class="step-label">Prerequisites: §A.1 + §A.2 complete · <code>claude</code> CLI authenticated.</p>
+      <pre class="cmd-app">cd polygence-anesthesia-graphRAG
+
+# 1. Run the pairwise judge with 6 parallel workers
+#    (resumable — re-run skips already-completed comparisons)
+python3 eval/judge.py --workers 6 --model haiku
+
+# 2. Verify output count (374 = 187 questions × 2 pairs)
+wc -l eval/judgments.jsonl
+
+# 3. Sanity-check the headline number — A3 vs A1 preference rate
+python3 -c "
+import json
+recs = [json.loads(l) for l in open('eval/judgments.jsonl') if not json.loads(l).get('error')]
+m = [r for r in recs if r['pair']=='A3_vs_A1']
+a3 = sum(1 for r in m if r['target_pick']=='A3')
+n  = sum(1 for r in m if r['target_pick']!='TIE')
+print(f'A3 wins {a3}/{n} = {100*a3/n:.0f}% (pre-registered threshold for H1: >55%)')"</pre>
       <ul class="meta-list">
-        <li><strong>Source:</strong> <a href="https://github.com/mihikap01/polygence-anesthesia-graphRAG/blob/main/eval/judge.py">eval/judge.py</a></li>
+        <li><strong>Source on GitHub:</strong> <a href="https://github.com/mihikap01/polygence-anesthesia-graphRAG/blob/main/eval/judge.py">eval/judge.py</a></li>
         <li><strong>Produces:</strong> <code>eval/judgments.jsonl</code> (374 comparisons)</li>
         <li><strong>Time:</strong> ~20 minutes at 6 parallel workers · <strong>Cost:</strong> ~$7</li>
         <li><strong>Where it shows up in the report:</strong> §4.1 Table 4 (the headline)</li>
@@ -1031,10 +1138,28 @@ Based on the knowledge graph context, **no formal PharmGKB clinical guidelines (
       <h4>Why we use it</h4>
       <p>Captures softer qualities (clinical caution, completeness) that the rule-based pass
         can't. Less powerful than pairwise but gives anchored absolute scores.</p>
-      <h4>Run it</h4>
-      <pre class="cmd-app">python3 eval/judge_rubric.py --workers 8 --model haiku</pre>
+      <h4>How to run from the repo</h4>
+      <p class="step-label">Prerequisites: §A.1 + §A.2 complete · <code>claude</code> CLI authenticated.</p>
+      <pre class="cmd-app">cd polygence-anesthesia-graphRAG
+
+# 1. Run the rubric judge with 8 parallel workers (resumable)
+python3 eval/judge_rubric.py --workers 8 --model haiku
+
+# 2. Verify output (one record per (question, arm) — target 748)
+wc -l eval/rubric.jsonl
+
+# 3. Sanity-check the per-arm means
+python3 -c "
+import json, statistics
+from collections import defaultdict
+recs = [json.loads(l) for l in open('eval/rubric.jsonl') if not json.loads(l).get('error')]
+by = defaultdict(list)
+for r in recs: by[r['arm']].append((r['faithfulness'], r['completeness'], r['clinical_soundness']))
+for arm in sorted(by):
+    f, c, s = zip(*by[arm])
+    print(f'{arm}: F={statistics.mean(f):.2f} C={statistics.mean(c):.2f} CS={statistics.mean(s):.2f}  (n={len(by[arm])})')"</pre>
       <ul class="meta-list">
-        <li><strong>Source:</strong> <a href="https://github.com/mihikap01/polygence-anesthesia-graphRAG/blob/main/eval/judge_rubric.py">eval/judge_rubric.py</a></li>
+        <li><strong>Source on GitHub:</strong> <a href="https://github.com/mihikap01/polygence-anesthesia-graphRAG/blob/main/eval/judge_rubric.py">eval/judge_rubric.py</a></li>
         <li><strong>Produces:</strong> <code>eval/rubric.jsonl</code> (one record per (question, arm))</li>
         <li><strong>Time:</strong> ~30 minutes at 8 parallel workers · <strong>Cost:</strong> ~$9</li>
         <li><strong>Where it shows up in the report:</strong> §4.3 Table 6</li>
@@ -1057,29 +1182,61 @@ Based on the knowledge graph context, **no formal PharmGKB clinical guidelines (
       <p>Pairwise preference can't see fabrication; the judge prefers fluent confidence.
         This metric exposes per-arm fabrication rate with a fair denominator. It is the only
         cross-arm-comparable hallucination measure.</p>
-      <h4>Run it</h4>
-      <pre class="cmd-app">python3 eval/segment.py --workers 4 --model haiku</pre>
+      <h4>How to run from the repo</h4>
+      <p class="step-label">Prerequisites: §A.1 + §A.2 complete · <code>claude</code> CLI authenticated.</p>
+      <pre class="cmd-app">cd polygence-anesthesia-graphRAG
+
+# 1. Run the segmentation pass (resumable)
+python3 eval/segment.py --workers 4 --model haiku
+
+# 2. Verify how many questions got segmented successfully
+python3 -c "
+import json
+recs = [json.loads(l) for l in open('eval/segments.jsonl')]
+ok = [r for r in recs if r.get('claims') and not r.get('error')]
+print(f'segmented: {len(ok)}/187')"</pre>
       <ul class="meta-list">
-        <li><strong>Source:</strong> <a href="https://github.com/mihikap01/polygence-anesthesia-graphRAG/blob/main/eval/segment.py">eval/segment.py</a></li>
+        <li><strong>Source on GitHub:</strong> <a href="https://github.com/mihikap01/polygence-anesthesia-graphRAG/blob/main/eval/segment.py">eval/segment.py</a></li>
         <li><strong>Produces:</strong> <code>eval/segments.jsonl</code> (one record per question)</li>
         <li><strong>Time:</strong> ~40 minutes at 4 parallel workers · <strong>Cost:</strong> ~$3</li>
         <li><strong>Where it shows up in the report:</strong> §4.4 Table 7</li>
         <li><strong>Known limitation:</strong> the Claude CLI sometimes hangs past its 120s
           timeout. Coverage on the original run was 57/187 (~31%) before being stopped; treat
-          absolute rates as directional, not definitive.</li>
+          absolute rates as directional, not definitive. Consider killing and resuming if a
+          single call exceeds ~10 minutes.</li>
       </ul>
     </div>
 
     <h3 id="a-report">A.7 — Aggregate everything into the report</h3>
-    <p>Reads all four <code>*.jsonl</code> outputs, computes the headline tables, generates this
-      HTML report and a machine-readable <code>results.json</code>.</p>
-    <pre class="cmd-app">python3 eval/report.py
-open eval/report.html</pre>
-    <ul class="meta-list">
-      <li><strong>Source:</strong> <a href="https://github.com/mihikap01/polygence-anesthesia-graphRAG/blob/main/eval/report.py">eval/report.py</a></li>
-      <li><strong>Produces:</strong> <code>eval/report.html</code> · <code>eval/results.json</code></li>
-      <li><strong>Time:</strong> ~1 second · <strong>Cost:</strong> $0</li>
-    </ul>
+    <div class="metric-block">
+      <h4>What it does</h4>
+      <p>Reads all four <code>*.jsonl</code> outputs from A.3–A.6, computes the headline tables
+        and the data-driven findings narrative, and generates this HTML report plus a
+        machine-readable <code>results.json</code>.</p>
+      <h4>How to run from the repo</h4>
+      <p class="step-label">Prerequisites: A.3 + A.4 are required for the headline; A.5 and A.6 enhance the report but it gracefully skips them if their JSONL files are absent.</p>
+      <pre class="cmd-app">cd polygence-anesthesia-graphRAG
+
+# 1. Regenerate the report
+python3 eval/report.py
+
+# 2. Inspect the headline numbers programmatically
+python3 -c "
+import json
+r = json.load(open('eval/results.json'))
+print('Loaded:', r['n_scores'], 'scores,', r['n_judgments'], 'judgments')
+m = r['pairwise']['A3_vs_A1']
+print(f'A3 vs A1 (the H1 test): {m[\"A3_wins\"]}/{m[\"A3_wins\"]+m[\"A1_wins\"]} = {100*m[\"armA_rate\"]:.0f}% A3 preferred (p={m[\"p_value\"]:.3f})')"
+
+# 3. Open the report in your default browser
+open eval/report.html      # macOS
+# xdg-open eval/report.html  # Linux</pre>
+      <ul class="meta-list">
+        <li><strong>Source on GitHub:</strong> <a href="https://github.com/mihikap01/polygence-anesthesia-graphRAG/blob/main/eval/report.py">eval/report.py</a></li>
+        <li><strong>Produces:</strong> <code>eval/report.html</code> (this page) · <code>eval/results.json</code> (machine-readable summary of every metric)</li>
+        <li><strong>Time:</strong> ~1 second · <strong>Cost:</strong> $0</li>
+      </ul>
+    </div>
 
     <h3 id="a-code">A.8 — Full eval source code reference</h3>
     <p>Every file involved in the evaluation, with GitHub links:</p>
