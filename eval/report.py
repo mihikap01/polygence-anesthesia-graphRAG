@@ -27,10 +27,10 @@ EVAL = ROOT / "eval"
 
 ARMS = ["A0", "A1", "A2", "A3"]
 ARM_LABELS = {
-    "A0": "A0 — no context",
-    "A1": "A1 — naïve RAG",
-    "A2": "A2 — full subgraph",
-    "A3": "A3 — GraphRAG",
+    "A0": "A0 · LLM alone (no context)",
+    "A1": "A1 · LLM + plain-text retrieval",
+    "A2": "A2 · LLM + full subgraph dump",
+    "A3": "A3 · LLM + GraphRAG (the system)",
 }
 STRATUM_NAMES = {
     "S1": "Well-known facts",
@@ -249,8 +249,10 @@ def fmt_n(x):
 def html_headline(headline, judgments_summary) -> str:
     rows = []
     rows.append('<table><thead><tr><th>Arm</th><th class="right">n</th><th class="right">Errors</th>'
-                '<th class="right">Answer chars</th><th class="right">Latency</th>'
-                '<th class="right">Entity recall</th><th class="right">PMID exists</th></tr></thead><tbody>')
+                '<th class="right">Answer length</th><th class="right">Latency</th>'
+                '<th class="right" title="% of expected entities (drugs/genes/etc.) the answer named">Entity recall</th>'
+                '<th class="right" title="% of cited PMIDs that exist in our corpus (vs. invented)">PMIDs real (when cited)</th>'
+                '</tr></thead><tbody>')
     for arm in ARMS:
         m = headline[arm]
         is_a3 = "highlight" if arm == "A3" else ""
@@ -611,37 +613,44 @@ def html_findings(pw: dict, pwps: dict, head: dict) -> str:
     h1_word = "SUPPORTED" if h1_supported else "NOT SUPPORTED"
 
     return f"""
-    <h2>Key findings</h2>
+    <h2>What the numbers tell us</h2>
     <div class="callout">
-      <span class="callout-label">H1 (primary): {h1_word}</span>
-      GraphRAG (A3) vs. strong naïve RAG (A1): <strong>{fmt_pct(a1_rate)} A3-preferred</strong>
-      ({a1w_a3}–{a1w_o}, sign-test p={a1_p:.3f}). This is a statistical tie — the graph layer
-      did <strong>not</strong> beat strong hybrid retrieval on this question set. The pre-registered
-      bar was &gt;55% with p&lt;0.05.
+      <span class="callout-label">Primary verdict: H1 {h1_word}</span>
+      When the blinded judge compared GraphRAG's answer to plain-text RAG's answer on the same
+      question, <strong>GraphRAG was picked {fmt_pct(a1_rate)} of the time</strong> ({a1w_a3} wins
+      out of {a1w_a3+a1w_o} decisive comparisons). The pre-declared "win" threshold was &gt;55%
+      with p&lt;0.05. We got p={a1_p:.2f} — meaning the difference is indistinguishable from
+      pure chance. GraphRAG did not earn its complexity on this benchmark.
     </div>
     <ul>
-      <li><strong>H2 (multi-hop): not supported.</strong> On S3 (multi-hop), A3 was preferred only
-        {fmt_pct(s3)} of the time — it <em>lost</em> to A1. This matches the hostile reviewer's prior:
-        PharmGKB rows are already denormalised, so a strong retriever recovers multi-hop facts without
-        needing graph traversal.</li>
-      <li><strong>H3 (no regression): mild regression.</strong> On S1 (well-known facts) A3 was
-        preferred only {fmt_pct(strat_rate("A3_vs_A1","S1"))} vs A1 — the extra graph context reads as
-        noise on trivially-known questions.</li>
-      <li><strong>A3's one genuine win: out-of-distribution refusal (S7, {fmt_pct(s7)}).</strong> When a
-        drug isn't in the graph, A3 cleanly refuses; A1's retrieval always returns <em>something</em>,
-        tempting it to answer. This is the clearest evidence that graph structure helps — knowing what's
-        <em>absent</em>.</li>
-      <li><strong>A3's apparent S4 win ({fmt_pct(s4)}) is a confound, not a win.</strong> The held-out
-        split removed <code>clinicalVariants</code> rows but not <code>relationships.tsv</code> rows, so
-        A1 could still retrieve the (correct) PMIDs while A3's graph genuinely lost them. The judge then
-        <em>preferred A3's refusal over A1's correct citation</em> — rewarding caution over verifiable
-        grounding.</li>
-      <li><strong>The meta-finding — preference ≠ correctness.</strong> A0 (no context) "won" the
-        preference test ({fmt_pct(a0_rate)} A3-preferred, p={a0_p:.4f} — i.e. A0 strongly favoured),
-        yet A0's cited PMIDs were real only <strong>{fmt_pct(a0_pmid)}</strong> of the time vs.
-        {fmt_pct(a3_pmid)} for A3. The LLM judge is fooled by fluent, confident prose and cannot detect
-        fabricated citations. This is precisely why the design pairs subjective preference with
-        deterministic rule-based metrics.</li>
+      <li><strong>The multi-hop test (H2): also lost.</strong> Questions specifically designed to
+        require reasoning across multiple graph edges — exactly where the structure should shine —
+        had GraphRAG winning only {fmt_pct(s3)} of the time vs plain-text RAG. The reason:
+        PharmGKB rows already pack drug + gene + variant + phenotype + evidence level into a
+        single row, so a good text retriever recovers "multi-hop" facts in a single chunk
+        without needing graph traversal.</li>
+      <li><strong>On easy questions (H3): mild regression.</strong> Even on well-known facts
+        where adding context shouldn't matter, GraphRAG was picked only
+        {fmt_pct(strat_rate("A3_vs_A1","S1"))} of the time — the extra graph context reads as
+        noise when the answer is trivially known.</li>
+      <li><strong>The one genuine win: knowing what the graph doesn't contain.</strong> On
+        questions about drugs the graph genuinely lacks (out-of-distribution test), GraphRAG was
+        preferred {fmt_pct(s7)} of the time. It says "I don't have that"; plain-text retrieval
+        returns vaguely-related junk and the model answers confidently. Knowing the boundaries
+        of the data is the graph's structural value, not multi-hop reasoning.</li>
+      <li><strong>The apparent citation win is a confound, not a real win.</strong> On
+        citation-grounding questions GraphRAG was picked {fmt_pct(s4)} of the time — but the
+        reason isn't grounding. The held-out test set removed one PharmGKB file but not another
+        that restates many of the same facts. Plain-text RAG could still retrieve correct PMIDs
+        from the un-held-out file; GraphRAG's graph genuinely lost them and refused to cite. The
+        judge rewarded refusal over correct citation. The metric is measuring caution, not truth.</li>
+      <li><strong>The meta-finding: preference ≠ correctness.</strong> The no-context model
+        (just the LLM, no retrieved data at all) was picked {fmt_pct(1-a0_rate)} of the time over
+        GraphRAG — a strong win. But when we checked whether its cited paper IDs (PMIDs) were
+        real, only {fmt_pct(a0_pmid)} actually existed. GraphRAG's cited PMIDs were real
+        {fmt_pct(a3_pmid)} of the time. The LLM judge was fooled by fluent confidence and
+        couldn't detect fabricated citations. This is the entire reason the design uses both
+        subjective preference and deterministic ground-truth checks.</li>
     </ul>
     <div class="callout">
       <span class="callout-label">Bottom line</span>
@@ -728,6 +737,52 @@ Rules:
 - Do not fabricate dosing recommendations or clinical advice."""
 
 
+def html_glossary() -> str:
+    return """
+    <details open style="margin:8px 0 32px;">
+      <summary style="font-size:14px;">Reading guide — what the codes and metrics mean</summary>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:14px;font-size:13px;">
+        <div>
+          <h4 style="margin:0 0 8px;font-size:13px;">The four arms (approaches we compared)</h4>
+          <ul style="margin:0;padding-left:18px;color:var(--muted);">
+            <li><strong>A0 · LLM alone</strong> — question only, no retrieved context</li>
+            <li><strong>A1 · plain-text RAG</strong> — strong text-similarity search returns relevant text chunks</li>
+            <li><strong>A2 · full subgraph dump</strong> — entire anesthesia subgraph as plain text</li>
+            <li><strong>A3 · GraphRAG</strong> — the system: entity-link → graph neighborhood → structured prompt</li>
+          </ul>
+        </div>
+        <div>
+          <h4 style="margin:0 0 8px;font-size:13px;">The eight question types (strata)</h4>
+          <ul style="margin:0;padding-left:18px;color:var(--muted);">
+            <li><strong>S1</strong> well-known facts · <strong>S2</strong> evidence levels</li>
+            <li><strong>S3 multi-hop</strong> · <strong>S4 citations</strong> (PMIDs)</li>
+            <li><strong>S5</strong> long-tail/niche · <strong>S6</strong> negative controls</li>
+            <li><strong>S7</strong> out-of-distribution · <strong>S8</strong> comparative</li>
+          </ul>
+        </div>
+        <div>
+          <h4 style="margin:0 0 8px;font-size:13px;">Key metrics</h4>
+          <ul style="margin:0;padding-left:18px;color:var(--muted);">
+            <li><strong>Pairwise preference</strong> — % of times a judge picks the arm's answer over another, blinded</li>
+            <li><strong>Entity recall</strong> — % of expected entities (drugs/genes/etc.) the answer mentioned</li>
+            <li><strong>PMID exists rate</strong> — % of cited paper IDs that are real (vs. fabricated)</li>
+            <li><strong>Faithfulness / Completeness / Clinical-soundness</strong> — judge rating 1–5</li>
+            <li><strong>Support rate</strong> — % of an arm's atomic factual claims that are correct</li>
+          </ul>
+        </div>
+        <div>
+          <h4 style="margin:0 0 8px;font-size:13px;">Statistical shorthand</h4>
+          <ul style="margin:0;padding-left:18px;color:var(--muted);">
+            <li><strong>p &lt; 0.05</strong> — chance is &lt; 5% the difference is luck</li>
+            <li><strong>p ≈ 0.5–1.0</strong> — indistinguishable from random</li>
+            <li><strong>n</strong> = sample size</li>
+            <li><strong>95% CI</strong> — true value is plausibly anywhere in this range</li>
+          </ul>
+        </div>
+      </div>
+    </details>"""
+
+
 def html_tldr(pw: dict, head: dict, rub: dict) -> str:
     """One-paragraph summary, lead with the headline result."""
     def rate(pair):
@@ -743,20 +798,23 @@ def html_tldr(pw: dict, head: dict, rub: dict) -> str:
     a3_pmid = head["A3"]["pmid_exists_rate_mean"]
     return f"""
     <div class="tldr">
-      <h3>TL;DR</h3>
-      <p>We tested whether a knowledge-graph layer (GraphRAG) over PharmGKB pharmacogenomic data
-        produces better answers than a frontier LLM alone, or than the same LLM with strong
-        plain-text retrieval. <strong>Across 187 held-out questions, GraphRAG (A3) tied strong
-        hybrid retrieval (A1) on blinded pairwise preference ({fmt_pct(a1_rate)},
-        p={a1_p:.2f})</strong> — H1 was <em>not supported</em>.</p>
-      <p>The deeper finding: across <em>four independent metric families</em> (preference,
-        rule-based, rubric ratings, merged-claim hallucination), the LLM judge consistently
-        preferred the model's own no-context answers — even though those answers fabricated
-        specific PMIDs <strong>{fmt_pct(1-a0_pmid)}</strong> of the time (vs.
-        {fmt_pct(1-a3_pmid)} for GraphRAG). GraphRAG is more grounded; the judges can't tell.</p>
-      <p>The one place GraphRAG <em>did</em> win cleanly was <strong>out-of-distribution
-        refusal</strong> — knowing what the graph does not contain. The structural value of the
-        graph in this domain is "knowing the boundaries," not "multi-hop reasoning."</p>
+      <h3>TL;DR — three findings in plain English</h3>
+      <p><strong>1. GraphRAG did not beat plain-text retrieval.</strong> When a blinded judge
+        compared GraphRAG's answers against the same model using plain-text search over the same
+        data, GraphRAG was picked {fmt_pct(a1_rate)} of the time — statistically a coin flip
+        (we'd expect 50%, p={a1_p:.2f} means the difference is indistinguishable from luck).
+        Across 187 carefully designed questions, the graph layer did not earn its complexity.</p>
+      <p><strong>2. The LLM judge prefers fluent confidence over factual grounding.</strong> The
+        no-context model — given no retrieved data at all — actually won the preference test most
+        often. But it invented PMIDs (fake paper citations) <strong>{fmt_pct(1-a0_pmid)} of the
+        time</strong>. GraphRAG fabricated PMIDs only {fmt_pct(1-a3_pmid)} of the time. The
+        judges couldn't tell the difference between real and fake citations, so they rewarded
+        the more confident-sounding answers.</p>
+      <p><strong>3. The graph's one real win is knowing what it doesn't know.</strong> On
+        questions about drugs not in the graph, GraphRAG refused to answer; plain-text retrieval
+        returned vaguely-related junk and the model answered confidently from that. The
+        structural value of the graph here is "knowing the boundaries," not "multi-hop
+        reasoning" as originally claimed.</p>
     </div>"""
 
 
@@ -971,10 +1029,12 @@ def html_hypotheses_cards(pw: dict, pwps: dict, head: dict, scores: list) -> str
     <div class="hyp h1">
       <div class="tag">H1<br><span class="muted" style="font-weight:400;font-size:11px;">primary</span></div>
       <div>
-        <div class="claim"><strong>GraphRAG (A3) beats strong naïve RAG (A1)</strong> on blinded
-          pairwise preference, &gt;55% with p&lt;0.05.</div>
+        <div class="claim"><strong>GraphRAG beats plain-text retrieval</strong> when a blinded
+          judge compares both answers — winning more than 55% of comparisons, with the difference
+          unlikely to be chance (p&lt;0.05).</div>
         <div class="muted" style="font-size:12px;margin-top:4px;">
-          Result: A3 won {a3w} of {a3w+aw} decisive comparisons ({fmt_pct(h1_rate)}); sign-test p={h1_p:.2f}.
+          Result: GraphRAG won {a3w} of {a3w+aw} comparisons ({fmt_pct(h1_rate)}); p={h1_p:.2f}
+          (i.e. statistically indistinguishable from a 50-50 coin flip).
         </div>
       </div>
       <div class="verdict {vcls(h1_ok)}">{vtxt(h1_ok)}</div>
@@ -982,11 +1042,12 @@ def html_hypotheses_cards(pw: dict, pwps: dict, head: dict, scores: list) -> str
     <div class="hyp">
       <div class="tag">H2<br><span class="muted" style="font-weight:400;font-size:11px;">multi-hop</span></div>
       <div>
-        <div class="claim">On S3 (multi-hop reasoning) — the questions specifically designed to
-          require graph traversal — A3 should outperform A1.</div>
+        <div class="claim">On <strong>multi-hop reasoning questions</strong> (the questions
+          specifically designed to require chaining through 2+ graph edges — variant → gene →
+          drug class), GraphRAG should outperform plain-text retrieval.</div>
         <div class="muted" style="font-size:12px;margin-top:4px;">
-          Result: A3 was preferred {s3_a3} of {s3_a3+s3_a1} times on S3 ({fmt_pct(h2_rate)}).
-          A3 lost.
+          Result: GraphRAG was preferred {s3_a3} of {s3_a3+s3_a1} times ({fmt_pct(h2_rate)}) —
+          plain-text retrieval actually won most multi-hop questions.
         </div>
       </div>
       <div class="verdict {vcls(h2_ok)}">{vtxt(h2_ok)}</div>
@@ -994,10 +1055,12 @@ def html_hypotheses_cards(pw: dict, pwps: dict, head: dict, scores: list) -> str
     <div class="hyp">
       <div class="tag">H3<br><span class="muted" style="font-weight:400;font-size:11px;">no regression</span></div>
       <div>
-        <div class="claim">On S1 (easy / well-known facts), A3 should be within 5pp of A0 on
-          entity recall — adding graph context shouldn't hurt easy questions.</div>
+        <div class="claim">On <strong>easy / well-known questions</strong>, GraphRAG should be
+          within 5 percentage points of the no-context model on "did the answer name the right
+          entities" — adding context shouldn't hurt easy questions.</div>
         <div class="muted" style="font-size:12px;margin-top:4px;">
-          Result: A0 entity recall {fmt_pct(a0_er)}, A3 {fmt_pct(a3_er)}, |diff| {fmt_pct(h3_diff)}.
+          Result: no-context model named {fmt_pct(a0_er)} of expected entities, GraphRAG
+          {fmt_pct(a3_er)}; difference {fmt_pct(h3_diff)} (above the 5pp tolerance).
         </div>
       </div>
       <div class="verdict {vcls(h3_ok)}">{vtxt(h3_ok)}</div>
@@ -1146,6 +1209,9 @@ def main() -> int:
 
     # TL;DR
     body.append(html_tldr(pw, head, rub))
+
+    # Glossary — keeps the rest of the report readable without flipping back
+    body.append(html_glossary())
 
     # 1. Setup
     body.append(html_setup_60s())

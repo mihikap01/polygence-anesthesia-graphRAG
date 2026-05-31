@@ -94,21 +94,66 @@ footer { color:var(--muted); font-size:12px; margin-top:48px; padding-top:24px; 
 }
 </style></head><body><div class="wrap"><div class="hero"><span class="pill"><span class="dot"></span> GraphRAG eval · 4 arms × 187 held-out PharmGKB questions</span><h1>Does <em>graph structure</em> actually help an LLM answer pharmacogenomics questions?</h1><p class="muted" style="max-width:640px;margin:8px auto 0;">A blinded, falsifiable, four-arm evaluation of the Polygence GraphRAG demo, with cross-checks designed to reveal what LLM-as-judge can and cannot detect.</p></div>
     <div class="tldr">
-      <h3>TL;DR</h3>
-      <p>We tested whether a knowledge-graph layer (GraphRAG) over PharmGKB pharmacogenomic data
-        produces better answers than a frontier LLM alone, or than the same LLM with strong
-        plain-text retrieval. <strong>Across 187 held-out questions, GraphRAG (A3) tied strong
-        hybrid retrieval (A1) on blinded pairwise preference (48.9%,
-        p=0.83)</strong> — H1 was <em>not supported</em>.</p>
-      <p>The deeper finding: across <em>four independent metric families</em> (preference,
-        rule-based, rubric ratings, merged-claim hallucination), the LLM judge consistently
-        preferred the model's own no-context answers — even though those answers fabricated
-        specific PMIDs <strong>68.3%</strong> of the time (vs.
-        33.3% for GraphRAG). GraphRAG is more grounded; the judges can't tell.</p>
-      <p>The one place GraphRAG <em>did</em> win cleanly was <strong>out-of-distribution
-        refusal</strong> — knowing what the graph does not contain. The structural value of the
-        graph in this domain is "knowing the boundaries," not "multi-hop reasoning."</p>
+      <h3>TL;DR — three findings in plain English</h3>
+      <p><strong>1. GraphRAG did not beat plain-text retrieval.</strong> When a blinded judge
+        compared GraphRAG's answers against the same model using plain-text search over the same
+        data, GraphRAG was picked 48.9% of the time — statistically a coin flip
+        (we'd expect 50%, p=0.83 means the difference is indistinguishable from luck).
+        Across 187 carefully designed questions, the graph layer did not earn its complexity.</p>
+      <p><strong>2. The LLM judge prefers fluent confidence over factual grounding.</strong> The
+        no-context model — given no retrieved data at all — actually won the preference test most
+        often. But it invented PMIDs (fake paper citations) <strong>68.3% of the
+        time</strong>. GraphRAG fabricated PMIDs only 33.3% of the time. The
+        judges couldn't tell the difference between real and fake citations, so they rewarded
+        the more confident-sounding answers.</p>
+      <p><strong>3. The graph's one real win is knowing what it doesn't know.</strong> On
+        questions about drugs not in the graph, GraphRAG refused to answer; plain-text retrieval
+        returned vaguely-related junk and the model answered confidently from that. The
+        structural value of the graph here is "knowing the boundaries," not "multi-hop
+        reasoning" as originally claimed.</p>
     </div>
+    <details open style="margin:8px 0 32px;">
+      <summary style="font-size:14px;">Reading guide — what the codes and metrics mean</summary>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:14px;font-size:13px;">
+        <div>
+          <h4 style="margin:0 0 8px;font-size:13px;">The four arms (approaches we compared)</h4>
+          <ul style="margin:0;padding-left:18px;color:var(--muted);">
+            <li><strong>A0 · LLM alone</strong> — question only, no retrieved context</li>
+            <li><strong>A1 · plain-text RAG</strong> — strong text-similarity search returns relevant text chunks</li>
+            <li><strong>A2 · full subgraph dump</strong> — entire anesthesia subgraph as plain text</li>
+            <li><strong>A3 · GraphRAG</strong> — the system: entity-link → graph neighborhood → structured prompt</li>
+          </ul>
+        </div>
+        <div>
+          <h4 style="margin:0 0 8px;font-size:13px;">The eight question types (strata)</h4>
+          <ul style="margin:0;padding-left:18px;color:var(--muted);">
+            <li><strong>S1</strong> well-known facts · <strong>S2</strong> evidence levels</li>
+            <li><strong>S3 multi-hop</strong> · <strong>S4 citations</strong> (PMIDs)</li>
+            <li><strong>S5</strong> long-tail/niche · <strong>S6</strong> negative controls</li>
+            <li><strong>S7</strong> out-of-distribution · <strong>S8</strong> comparative</li>
+          </ul>
+        </div>
+        <div>
+          <h4 style="margin:0 0 8px;font-size:13px;">Key metrics</h4>
+          <ul style="margin:0;padding-left:18px;color:var(--muted);">
+            <li><strong>Pairwise preference</strong> — % of times a judge picks the arm's answer over another, blinded</li>
+            <li><strong>Entity recall</strong> — % of expected entities (drugs/genes/etc.) the answer mentioned</li>
+            <li><strong>PMID exists rate</strong> — % of cited paper IDs that are real (vs. fabricated)</li>
+            <li><strong>Faithfulness / Completeness / Clinical-soundness</strong> — judge rating 1–5</li>
+            <li><strong>Support rate</strong> — % of an arm's atomic factual claims that are correct</li>
+          </ul>
+        </div>
+        <div>
+          <h4 style="margin:0 0 8px;font-size:13px;">Statistical shorthand</h4>
+          <ul style="margin:0;padding-left:18px;color:var(--muted);">
+            <li><strong>p &lt; 0.05</strong> — chance is &lt; 5% the difference is luck</li>
+            <li><strong>p ≈ 0.5–1.0</strong> — indistinguishable from random</li>
+            <li><strong>n</strong> = sample size</li>
+            <li><strong>95% CI</strong> — true value is plausibly anywhere in this range</li>
+          </ul>
+        </div>
+      </div>
+    </details>
     <span class="section-tag">1 · the setup</span>
     <h2>What we built and what we're testing</h2>
     <p>The project under test is a <strong>pharmacogenomic GraphRAG demo</strong>: a knowledge
@@ -298,10 +343,12 @@ User question: {the question}</pre>
     <div class="hyp h1">
       <div class="tag">H1<br><span class="muted" style="font-weight:400;font-size:11px;">primary</span></div>
       <div>
-        <div class="claim"><strong>GraphRAG (A3) beats strong naïve RAG (A1)</strong> on blinded
-          pairwise preference, &gt;55% with p&lt;0.05.</div>
+        <div class="claim"><strong>GraphRAG beats plain-text retrieval</strong> when a blinded
+          judge compares both answers — winning more than 55% of comparisons, with the difference
+          unlikely to be chance (p&lt;0.05).</div>
         <div class="muted" style="font-size:12px;margin-top:4px;">
-          Result: A3 won 91 of 186 decisive comparisons (48.9%); sign-test p=0.83.
+          Result: GraphRAG won 91 of 186 comparisons (48.9%); p=0.83
+          (i.e. statistically indistinguishable from a 50-50 coin flip).
         </div>
       </div>
       <div class="verdict bad">✗ NOT SUPPORTED</div>
@@ -309,11 +356,12 @@ User question: {the question}</pre>
     <div class="hyp">
       <div class="tag">H2<br><span class="muted" style="font-weight:400;font-size:11px;">multi-hop</span></div>
       <div>
-        <div class="claim">On S3 (multi-hop reasoning) — the questions specifically designed to
-          require graph traversal — A3 should outperform A1.</div>
+        <div class="claim">On <strong>multi-hop reasoning questions</strong> (the questions
+          specifically designed to require chaining through 2+ graph edges — variant → gene →
+          drug class), GraphRAG should outperform plain-text retrieval.</div>
         <div class="muted" style="font-size:12px;margin-top:4px;">
-          Result: A3 was preferred 17 of 40 times on S3 (42.5%).
-          A3 lost.
+          Result: GraphRAG was preferred 17 of 40 times (42.5%) —
+          plain-text retrieval actually won most multi-hop questions.
         </div>
       </div>
       <div class="verdict bad">✗ NOT SUPPORTED</div>
@@ -321,10 +369,12 @@ User question: {the question}</pre>
     <div class="hyp">
       <div class="tag">H3<br><span class="muted" style="font-weight:400;font-size:11px;">no regression</span></div>
       <div>
-        <div class="claim">On S1 (easy / well-known facts), A3 should be within 5pp of A0 on
-          entity recall — adding graph context shouldn't hurt easy questions.</div>
+        <div class="claim">On <strong>easy / well-known questions</strong>, GraphRAG should be
+          within 5 percentage points of the no-context model on "did the answer name the right
+          entities" — adding context shouldn't hurt easy questions.</div>
         <div class="muted" style="font-size:12px;margin-top:4px;">
-          Result: A0 entity recall 82.5%, A3 92.5%, |diff| 10.0%.
+          Result: no-context model named 82.5% of expected entities, GraphRAG
+          92.5%; difference 10.0% (above the 5pp tolerance).
         </div>
       </div>
       <div class="verdict bad">✗ NOT SUPPORTED</div>
@@ -360,29 +410,29 @@ User question: {the question}</pre>
     </div><span class="section-tag">9 · the results</span><h2>Headline — blinded pairwise preference (n=187)</h2><p class="muted">For each question, Claude Haiku saw both answers blinded with order randomised, and picked the better one. A3 winning &gt;55% with p&lt;0.05 would have supported H1.</p><table><thead><tr><th>Comparison</th><th class="right">n</th><th class="right">A3 wins</th><th class="right">Other wins</th><th class="right">Ties</th><th class="right">A3 preferred</th><th class="right">95% CI</th><th class="right">p</th><th>Verdict</th></tr></thead><tbody>
 <tr><td>A3 vs A0</td><td class="right">187</td><td class="right">52</td><td class="right">135</td><td class="right">0</td><td class="right"><strong>27.8%</strong></td><td class="right">21.9% – 34.6%</td><td class="right">0.0000</td><td>Other arm wins</td></tr>
 <tr><td>A3 vs A1</td><td class="right">186</td><td class="right">91</td><td class="right">95</td><td class="right">0</td><td class="right"><strong>48.9%</strong></td><td class="right">41.8% – 56.1%</td><td class="right">0.8260</td><td>Inconclusive</td></tr>
-</tbody></table><span class="section-tag">10 · the supporting numbers</span><h2>Rule-based metrics (overall)</h2><p class="muted">Deterministic Python. PMID exists in our corpus, entity recall vs gold, etc. Same definition across all arms.</p><table><thead><tr><th>Arm</th><th class="right">n</th><th class="right">Errors</th><th class="right">Answer chars</th><th class="right">Latency</th><th class="right">Entity recall</th><th class="right">PMID exists</th></tr></thead><tbody>
-<tr class=""><td>A0 — no context</td><td class="right">187</td><td class="right">0</td><td class="right">1286.4</td><td class="right">23.6s</td><td class="right">91.4%</td><td class="right">31.7%</td></tr>
-<tr class=""><td>A1 — naïve RAG</td><td class="right">187</td><td class="right">1</td><td class="right">1087.9</td><td class="right">13.7s</td><td class="right">90.2%</td><td class="right">100.0%</td></tr>
-<tr class=""><td>A2 — full subgraph</td><td class="right">187</td><td class="right">0</td><td class="right">931.8</td><td class="right">11.9s</td><td class="right">90.6%</td><td class="right">0.0%</td></tr>
-<tr class="highlight"><td>A3 — GraphRAG</td><td class="right">187</td><td class="right">0</td><td class="right">1170.0</td><td class="right">13.7s</td><td class="right">94.0%</td><td class="right">66.7%</td></tr>
+</tbody></table><span class="section-tag">10 · the supporting numbers</span><h2>Rule-based metrics (overall)</h2><p class="muted">Deterministic Python. PMID exists in our corpus, entity recall vs gold, etc. Same definition across all arms.</p><table><thead><tr><th>Arm</th><th class="right">n</th><th class="right">Errors</th><th class="right">Answer length</th><th class="right">Latency</th><th class="right" title="% of expected entities (drugs/genes/etc.) the answer named">Entity recall</th><th class="right" title="% of cited PMIDs that exist in our corpus (vs. invented)">PMIDs real (when cited)</th></tr></thead><tbody>
+<tr class=""><td>A0 · LLM alone (no context)</td><td class="right">187</td><td class="right">0</td><td class="right">1286.4</td><td class="right">23.6s</td><td class="right">91.4%</td><td class="right">31.7%</td></tr>
+<tr class=""><td>A1 · LLM + plain-text retrieval</td><td class="right">187</td><td class="right">1</td><td class="right">1087.9</td><td class="right">13.7s</td><td class="right">90.2%</td><td class="right">100.0%</td></tr>
+<tr class=""><td>A2 · LLM + full subgraph dump</td><td class="right">187</td><td class="right">0</td><td class="right">931.8</td><td class="right">11.9s</td><td class="right">90.6%</td><td class="right">0.0%</td></tr>
+<tr class="highlight"><td>A3 · LLM + GraphRAG (the system)</td><td class="right">187</td><td class="right">0</td><td class="right">1170.0</td><td class="right">13.7s</td><td class="right">94.0%</td><td class="right">66.7%</td></tr>
 </tbody></table><h2>Rubric ratings — F / C / CS  <span class="muted">(n=445/748)</span></h2><p class="muted">Each answer rated 1–5 on Faithfulness (claims supported), Completeness (covers gold), Clinical soundness (would a pharmacist call it misleading). Mean ± 95% CI half-width.</p><table><thead><tr><th>Arm</th><th class="right">n</th><th class="right">Faithfulness</th><th class="right">Completeness</th><th class="right">Clinical soundness</th></tr></thead><tbody>
-<tr class=""><td>A0 — no context</td><td class="right">111</td><td class="right">3.49 ± 0.25</td><td class="right">3.41 ± 0.29</td><td class="right">3.85 ± 0.24</td></tr>
-<tr class=""><td>A1 — naïve RAG</td><td class="right">110</td><td class="right">3.43 ± 0.28</td><td class="right">3.26 ± 0.30</td><td class="right">3.76 ± 0.25</td></tr>
-<tr class=""><td>A2 — full subgraph</td><td class="right">111</td><td class="right">3.07 ± 0.24</td><td class="right">1.73 ± 0.26</td><td class="right">3.14 ± 0.21</td></tr>
-<tr class="highlight"><td>A3 — GraphRAG</td><td class="right">113</td><td class="right">3.07 ± 0.28</td><td class="right">3.05 ± 0.32</td><td class="right">3.40 ± 0.28</td></tr>
+<tr class=""><td>A0 · LLM alone (no context)</td><td class="right">111</td><td class="right">3.49 ± 0.25</td><td class="right">3.41 ± 0.29</td><td class="right">3.85 ± 0.24</td></tr>
+<tr class=""><td>A1 · LLM + plain-text retrieval</td><td class="right">110</td><td class="right">3.43 ± 0.28</td><td class="right">3.26 ± 0.30</td><td class="right">3.76 ± 0.25</td></tr>
+<tr class=""><td>A2 · LLM + full subgraph dump</td><td class="right">111</td><td class="right">3.07 ± 0.24</td><td class="right">1.73 ± 0.26</td><td class="right">3.14 ± 0.21</td></tr>
+<tr class="highlight"><td>A3 · LLM + GraphRAG (the system)</td><td class="right">113</td><td class="right">3.07 ± 0.28</td><td class="right">3.05 ± 0.32</td><td class="right">3.40 ± 0.28</td></tr>
 </tbody></table><p class="muted"><em>Coverage caveat:</em> rubric run hit Claude CLI hangs in late-S7/S8. Final coverage 445/748 ≈ 59%. Per-arm counts balanced; means meaningful.</p><h2>Hallucination rate — merged claims  <span class="muted">(n=57/187)</span></h2><p class="muted">Per question, the judge extracts the union of atomic claims across all 4 answers, then per-arm scores each as supported / unsupported / unverifiable. Same denominator across arms.</p><p class="muted">Across 57 questions whose merged-claim list was extracted (blinded across arms). Each arm scored on the <em>same</em> set of claims, so the denominator is comparable across arms.</p>
 <table><thead><tr><th>Arm</th><th class="right">Claims made</th><th class="right">Supported</th><th class="right">Unsupported</th><th class="right">Unverifiable</th><th class="right">Hallucination rate</th><th class="right">Support rate</th></tr></thead><tbody>
-<tr class=""><td>A0 — no context</td><td class="right">463</td><td class="right">343</td><td class="right">15</td><td class="right">105</td><td class="right">3.2%</td><td class="right">74.1%</td></tr>
-<tr class=""><td>A1 — naïve RAG</td><td class="right">343</td><td class="right">237</td><td class="right">12</td><td class="right">94</td><td class="right">3.5%</td><td class="right">69.1%</td></tr>
-<tr class=""><td>A2 — full subgraph</td><td class="right">207</td><td class="right">114</td><td class="right">21</td><td class="right">72</td><td class="right">10.1%</td><td class="right">55.1%</td></tr>
-<tr class="highlight"><td>A3 — GraphRAG</td><td class="right">434</td><td class="right">289</td><td class="right">16</td><td class="right">129</td><td class="right">3.7%</td><td class="right">66.6%</td></tr>
+<tr class=""><td>A0 · LLM alone (no context)</td><td class="right">463</td><td class="right">343</td><td class="right">15</td><td class="right">105</td><td class="right">3.2%</td><td class="right">74.1%</td></tr>
+<tr class=""><td>A1 · LLM + plain-text retrieval</td><td class="right">343</td><td class="right">237</td><td class="right">12</td><td class="right">94</td><td class="right">3.5%</td><td class="right">69.1%</td></tr>
+<tr class=""><td>A2 · LLM + full subgraph dump</td><td class="right">207</td><td class="right">114</td><td class="right">21</td><td class="right">72</td><td class="right">10.1%</td><td class="right">55.1%</td></tr>
+<tr class="highlight"><td>A3 · LLM + GraphRAG (the system)</td><td class="right">434</td><td class="right">289</td><td class="right">16</td><td class="right">129</td><td class="right">3.7%</td><td class="right">66.6%</td></tr>
 </tbody></table><p class="muted"><em>Coverage caveat:</em> segmentation stopped early after CLI hangs. Final coverage 57/187, biased to S1–S4. Treat as directional.</p><h2>Per-stratum breakdown</h2><p class="muted">Descriptive only — per-stratum n (12–40) is too small for inferential claims. Useful for seeing <em>where</em> each arm wins or loses.</p><h3>S1 — Well-known facts <span class="muted">(n=20)</span></h3>
 <table><thead><tr><th>Arm</th><th class="right">Entity recall</th><th class="right">PMID exists</th>
 </tr></thead><tbody>
-<tr class=""><td>A0 — no context</td><td class="right">82.5%</td><td class="right">33.3%</td></tr>
-<tr class=""><td>A1 — naïve RAG</td><td class="right">80.0%</td><td class="right">100.0%</td></tr>
-<tr class=""><td>A2 — full subgraph</td><td class="right">85.0%</td><td class="right">—</td></tr>
-<tr class="highlight"><td>A3 — GraphRAG</td><td class="right">92.5%</td><td class="right">—</td></tr>
+<tr class=""><td>A0 · LLM alone (no context)</td><td class="right">82.5%</td><td class="right">33.3%</td></tr>
+<tr class=""><td>A1 · LLM + plain-text retrieval</td><td class="right">80.0%</td><td class="right">100.0%</td></tr>
+<tr class=""><td>A2 · LLM + full subgraph dump</td><td class="right">85.0%</td><td class="right">—</td></tr>
+<tr class="highlight"><td>A3 · LLM + GraphRAG (the system)</td><td class="right">92.5%</td><td class="right">—</td></tr>
 </tbody></table>
 <table style="margin-top:8px;"><thead><tr><th>Pairwise</th><th class="right">A3 wins</th><th class="right">Other wins</th><th class="right">Ties</th></tr></thead><tbody>
 <tr><td>A3 vs A0</td><td class="right">5</td><td class="right">15</td><td class="right">0</td></tr>
@@ -392,10 +442,10 @@ User question: {the question}</pre>
 <table><thead><tr><th>Arm</th><th class="right">Entity recall</th><th class="right">PMID exists</th>
 <th class="right">Level match</th>
 </tr></thead><tbody>
-<tr class=""><td>A0 — no context</td><td class="right">94.7%</td><td class="right">10.0%</td><td class="right">70.8%</td></tr>
-<tr class=""><td>A1 — naïve RAG</td><td class="right">98.7%</td><td class="right">100.0%</td><td class="right">77.3%</td></tr>
-<tr class=""><td>A2 — full subgraph</td><td class="right">100.0%</td><td class="right">0.0%</td><td class="right">62.5%</td></tr>
-<tr class="highlight"><td>A3 — GraphRAG</td><td class="right">98.7%</td><td class="right">—</td><td class="right">80.0%</td></tr>
+<tr class=""><td>A0 · LLM alone (no context)</td><td class="right">94.7%</td><td class="right">10.0%</td><td class="right">70.8%</td></tr>
+<tr class=""><td>A1 · LLM + plain-text retrieval</td><td class="right">98.7%</td><td class="right">100.0%</td><td class="right">77.3%</td></tr>
+<tr class=""><td>A2 · LLM + full subgraph dump</td><td class="right">100.0%</td><td class="right">0.0%</td><td class="right">62.5%</td></tr>
+<tr class="highlight"><td>A3 · LLM + GraphRAG (the system)</td><td class="right">98.7%</td><td class="right">—</td><td class="right">80.0%</td></tr>
 </tbody></table>
 <table style="margin-top:8px;"><thead><tr><th>Pairwise</th><th class="right">A3 wins</th><th class="right">Other wins</th><th class="right">Ties</th></tr></thead><tbody>
 <tr><td>A3 vs A0</td><td class="right">3</td><td class="right">22</td><td class="right">0</td></tr>
@@ -404,10 +454,10 @@ User question: {the question}</pre>
 <h3>S3 — Multi-hop reasoning <span class="muted">(n=40)</span></h3>
 <table><thead><tr><th>Arm</th><th class="right">Entity recall</th><th class="right">PMID exists</th>
 </tr></thead><tbody>
-<tr class=""><td>A0 — no context</td><td class="right">82.0%</td><td class="right">22.2%</td></tr>
-<tr class=""><td>A1 — naïve RAG</td><td class="right">71.4%</td><td class="right">100.0%</td></tr>
-<tr class=""><td>A2 — full subgraph</td><td class="right">71.2%</td><td class="right">—</td></tr>
-<tr class="highlight"><td>A3 — GraphRAG</td><td class="right">82.9%</td><td class="right">—</td></tr>
+<tr class=""><td>A0 · LLM alone (no context)</td><td class="right">82.0%</td><td class="right">22.2%</td></tr>
+<tr class=""><td>A1 · LLM + plain-text retrieval</td><td class="right">71.4%</td><td class="right">100.0%</td></tr>
+<tr class=""><td>A2 · LLM + full subgraph dump</td><td class="right">71.2%</td><td class="right">—</td></tr>
+<tr class="highlight"><td>A3 · LLM + GraphRAG (the system)</td><td class="right">82.9%</td><td class="right">—</td></tr>
 </tbody></table>
 <table style="margin-top:8px;"><thead><tr><th>Pairwise</th><th class="right">A3 wins</th><th class="right">Other wins</th><th class="right">Ties</th></tr></thead><tbody>
 <tr><td>A3 vs A0</td><td class="right">6</td><td class="right">34</td><td class="right">0</td></tr>
@@ -417,10 +467,10 @@ User question: {the question}</pre>
 <table><thead><tr><th>Arm</th><th class="right">Entity recall</th><th class="right">PMID exists</th>
 <th class="right">PMID correct</th>
 </tr></thead><tbody>
-<tr class=""><td>A0 — no context</td><td class="right">98.0%</td><td class="right">28.2%</td><td class="right">8.7%</td></tr>
-<tr class=""><td>A1 — naïve RAG</td><td class="right">98.0%</td><td class="right">100.0%</td><td class="right">81.8%</td></tr>
-<tr class=""><td>A2 — full subgraph</td><td class="right">96.0%</td><td class="right">0.0%</td><td class="right">0.0%</td></tr>
-<tr class="highlight"><td>A3 — GraphRAG</td><td class="right">100.0%</td><td class="right">66.7%</td><td class="right">8.0%</td></tr>
+<tr class=""><td>A0 · LLM alone (no context)</td><td class="right">98.0%</td><td class="right">28.2%</td><td class="right">8.7%</td></tr>
+<tr class=""><td>A1 · LLM + plain-text retrieval</td><td class="right">98.0%</td><td class="right">100.0%</td><td class="right">81.8%</td></tr>
+<tr class=""><td>A2 · LLM + full subgraph dump</td><td class="right">96.0%</td><td class="right">0.0%</td><td class="right">0.0%</td></tr>
+<tr class="highlight"><td>A3 · LLM + GraphRAG (the system)</td><td class="right">100.0%</td><td class="right">66.7%</td><td class="right">8.0%</td></tr>
 </tbody></table>
 <table style="margin-top:8px;"><thead><tr><th>Pairwise</th><th class="right">A3 wins</th><th class="right">Other wins</th><th class="right">Ties</th></tr></thead><tbody>
 <tr><td>A3 vs A0</td><td class="right">8</td><td class="right">17</td><td class="right">0</td></tr>
@@ -429,10 +479,10 @@ User question: {the question}</pre>
 <h3>S5 — Long-tail / niche <span class="muted">(n=25)</span></h3>
 <table><thead><tr><th>Arm</th><th class="right">Entity recall</th><th class="right">PMID exists</th>
 </tr></thead><tbody>
-<tr class=""><td>A0 — no context</td><td class="right">98.0%</td><td class="right">43.8%</td></tr>
-<tr class=""><td>A1 — naïve RAG</td><td class="right">100.0%</td><td class="right">100.0%</td></tr>
-<tr class=""><td>A2 — full subgraph</td><td class="right">96.0%</td><td class="right">—</td></tr>
-<tr class="highlight"><td>A3 — GraphRAG</td><td class="right">100.0%</td><td class="right">—</td></tr>
+<tr class=""><td>A0 · LLM alone (no context)</td><td class="right">98.0%</td><td class="right">43.8%</td></tr>
+<tr class=""><td>A1 · LLM + plain-text retrieval</td><td class="right">100.0%</td><td class="right">100.0%</td></tr>
+<tr class=""><td>A2 · LLM + full subgraph dump</td><td class="right">96.0%</td><td class="right">—</td></tr>
+<tr class="highlight"><td>A3 · LLM + GraphRAG (the system)</td><td class="right">100.0%</td><td class="right">—</td></tr>
 </tbody></table>
 <table style="margin-top:8px;"><thead><tr><th>Pairwise</th><th class="right">A3 wins</th><th class="right">Other wins</th><th class="right">Ties</th></tr></thead><tbody>
 <tr><td>A3 vs A0</td><td class="right">9</td><td class="right">16</td><td class="right">0</td></tr>
@@ -442,10 +492,10 @@ User question: {the question}</pre>
 <table><thead><tr><th>Arm</th><th class="right">Entity recall</th><th class="right">PMID exists</th>
 <th class="right">Refusal correct</th>
 </tr></thead><tbody>
-<tr class=""><td>A0 — no context</td><td class="right">100.0%</td><td class="right">100.0%</td><td class="right">40.0%</td></tr>
-<tr class=""><td>A1 — naïve RAG</td><td class="right">100.0%</td><td class="right">100.0%</td><td class="right">64.0%</td></tr>
-<tr class=""><td>A2 — full subgraph</td><td class="right">98.0%</td><td class="right">—</td><td class="right">72.0%</td></tr>
-<tr class="highlight"><td>A3 — GraphRAG</td><td class="right">100.0%</td><td class="right">—</td><td class="right">48.0%</td></tr>
+<tr class=""><td>A0 · LLM alone (no context)</td><td class="right">100.0%</td><td class="right">100.0%</td><td class="right">40.0%</td></tr>
+<tr class=""><td>A1 · LLM + plain-text retrieval</td><td class="right">100.0%</td><td class="right">100.0%</td><td class="right">64.0%</td></tr>
+<tr class=""><td>A2 · LLM + full subgraph dump</td><td class="right">98.0%</td><td class="right">—</td><td class="right">72.0%</td></tr>
+<tr class="highlight"><td>A3 · LLM + GraphRAG (the system)</td><td class="right">100.0%</td><td class="right">—</td><td class="right">48.0%</td></tr>
 </tbody></table>
 <table style="margin-top:8px;"><thead><tr><th>Pairwise</th><th class="right">A3 wins</th><th class="right">Other wins</th><th class="right">Ties</th></tr></thead><tbody>
 <tr><td>A3 vs A0</td><td class="right">12</td><td class="right">13</td><td class="right">0</td></tr>
@@ -455,10 +505,10 @@ User question: {the question}</pre>
 <table><thead><tr><th>Arm</th><th class="right">Entity recall</th><th class="right">PMID exists</th>
 <th class="right">Refusal correct</th>
 </tr></thead><tbody>
-<tr class=""><td>A0 — no context</td><td class="right">100.0%</td><td class="right">—</td><td class="right">80.0%</td></tr>
-<tr class=""><td>A1 — naïve RAG</td><td class="right">100.0%</td><td class="right">100.0%</td><td class="right">46.7%</td></tr>
-<tr class=""><td>A2 — full subgraph</td><td class="right">100.0%</td><td class="right">—</td><td class="right">80.0%</td></tr>
-<tr class="highlight"><td>A3 — GraphRAG</td><td class="right">100.0%</td><td class="right">—</td><td class="right">73.3%</td></tr>
+<tr class=""><td>A0 · LLM alone (no context)</td><td class="right">100.0%</td><td class="right">—</td><td class="right">80.0%</td></tr>
+<tr class=""><td>A1 · LLM + plain-text retrieval</td><td class="right">100.0%</td><td class="right">100.0%</td><td class="right">46.7%</td></tr>
+<tr class=""><td>A2 · LLM + full subgraph dump</td><td class="right">100.0%</td><td class="right">—</td><td class="right">80.0%</td></tr>
+<tr class="highlight"><td>A3 · LLM + GraphRAG (the system)</td><td class="right">100.0%</td><td class="right">—</td><td class="right">73.3%</td></tr>
 </tbody></table>
 <table style="margin-top:8px;"><thead><tr><th>Pairwise</th><th class="right">A3 wins</th><th class="right">Other wins</th><th class="right">Ties</th></tr></thead><tbody>
 <tr><td>A3 vs A0</td><td class="right">7</td><td class="right">8</td><td class="right">0</td></tr>
@@ -467,46 +517,53 @@ User question: {the question}</pre>
 <h3>S8 — Comparative <span class="muted">(n=12)</span></h3>
 <table><thead><tr><th>Arm</th><th class="right">Entity recall</th><th class="right">PMID exists</th>
 </tr></thead><tbody>
-<tr class=""><td>A0 — no context</td><td class="right">75.0%</td><td class="right">—</td></tr>
-<tr class=""><td>A1 — naïve RAG</td><td class="right">81.8%</td><td class="right">100.0%</td></tr>
-<tr class=""><td>A2 — full subgraph</td><td class="right">95.8%</td><td class="right">—</td></tr>
-<tr class="highlight"><td>A3 — GraphRAG</td><td class="right">79.2%</td><td class="right">—</td></tr>
+<tr class=""><td>A0 · LLM alone (no context)</td><td class="right">75.0%</td><td class="right">—</td></tr>
+<tr class=""><td>A1 · LLM + plain-text retrieval</td><td class="right">81.8%</td><td class="right">100.0%</td></tr>
+<tr class=""><td>A2 · LLM + full subgraph dump</td><td class="right">95.8%</td><td class="right">—</td></tr>
+<tr class="highlight"><td>A3 · LLM + GraphRAG (the system)</td><td class="right">79.2%</td><td class="right">—</td></tr>
 </tbody></table>
 <table style="margin-top:8px;"><thead><tr><th>Pairwise</th><th class="right">A3 wins</th><th class="right">Other wins</th><th class="right">Ties</th></tr></thead><tbody>
 <tr><td>A3 vs A0</td><td class="right">2</td><td class="right">10</td><td class="right">0</td></tr>
 <tr><td>A3 vs A1</td><td class="right">2</td><td class="right">9</td><td class="right">0</td></tr>
 </tbody></table><span class="section-tag">11 · why this happened</span><h2>The deeper finding — preference ≠ correctness</h2>
-    <h2>Key findings</h2>
+    <h2>What the numbers tell us</h2>
     <div class="callout">
-      <span class="callout-label">H1 (primary): NOT SUPPORTED</span>
-      GraphRAG (A3) vs. strong naïve RAG (A1): <strong>48.9% A3-preferred</strong>
-      (91–95, sign-test p=0.826). This is a statistical tie — the graph layer
-      did <strong>not</strong> beat strong hybrid retrieval on this question set. The pre-registered
-      bar was &gt;55% with p&lt;0.05.
+      <span class="callout-label">Primary verdict: H1 NOT SUPPORTED</span>
+      When the blinded judge compared GraphRAG's answer to plain-text RAG's answer on the same
+      question, <strong>GraphRAG was picked 48.9% of the time</strong> (91 wins
+      out of 186 decisive comparisons). The pre-declared "win" threshold was &gt;55%
+      with p&lt;0.05. We got p=0.83 — meaning the difference is indistinguishable from
+      pure chance. GraphRAG did not earn its complexity on this benchmark.
     </div>
     <ul>
-      <li><strong>H2 (multi-hop): not supported.</strong> On S3 (multi-hop), A3 was preferred only
-        42.5% of the time — it <em>lost</em> to A1. This matches the hostile reviewer's prior:
-        PharmGKB rows are already denormalised, so a strong retriever recovers multi-hop facts without
-        needing graph traversal.</li>
-      <li><strong>H3 (no regression): mild regression.</strong> On S1 (well-known facts) A3 was
-        preferred only 35.0% vs A1 — the extra graph context reads as
-        noise on trivially-known questions.</li>
-      <li><strong>A3's one genuine win: out-of-distribution refusal (S7, 60.0%).</strong> When a
-        drug isn't in the graph, A3 cleanly refuses; A1's retrieval always returns <em>something</em>,
-        tempting it to answer. This is the clearest evidence that graph structure helps — knowing what's
-        <em>absent</em>.</li>
-      <li><strong>A3's apparent S4 win (96.0%) is a confound, not a win.</strong> The held-out
-        split removed <code>clinicalVariants</code> rows but not <code>relationships.tsv</code> rows, so
-        A1 could still retrieve the (correct) PMIDs while A3's graph genuinely lost them. The judge then
-        <em>preferred A3's refusal over A1's correct citation</em> — rewarding caution over verifiable
-        grounding.</li>
-      <li><strong>The meta-finding — preference ≠ correctness.</strong> A0 (no context) "won" the
-        preference test (27.8% A3-preferred, p=0.0000 — i.e. A0 strongly favoured),
-        yet A0's cited PMIDs were real only <strong>31.7%</strong> of the time vs.
-        66.7% for A3. The LLM judge is fooled by fluent, confident prose and cannot detect
-        fabricated citations. This is precisely why the design pairs subjective preference with
-        deterministic rule-based metrics.</li>
+      <li><strong>The multi-hop test (H2): also lost.</strong> Questions specifically designed to
+        require reasoning across multiple graph edges — exactly where the structure should shine —
+        had GraphRAG winning only 42.5% of the time vs plain-text RAG. The reason:
+        PharmGKB rows already pack drug + gene + variant + phenotype + evidence level into a
+        single row, so a good text retriever recovers "multi-hop" facts in a single chunk
+        without needing graph traversal.</li>
+      <li><strong>On easy questions (H3): mild regression.</strong> Even on well-known facts
+        where adding context shouldn't matter, GraphRAG was picked only
+        35.0% of the time — the extra graph context reads as
+        noise when the answer is trivially known.</li>
+      <li><strong>The one genuine win: knowing what the graph doesn't contain.</strong> On
+        questions about drugs the graph genuinely lacks (out-of-distribution test), GraphRAG was
+        preferred 60.0% of the time. It says "I don't have that"; plain-text retrieval
+        returns vaguely-related junk and the model answers confidently. Knowing the boundaries
+        of the data is the graph's structural value, not multi-hop reasoning.</li>
+      <li><strong>The apparent citation win is a confound, not a real win.</strong> On
+        citation-grounding questions GraphRAG was picked 96.0% of the time — but the
+        reason isn't grounding. The held-out test set removed one PharmGKB file but not another
+        that restates many of the same facts. Plain-text RAG could still retrieve correct PMIDs
+        from the un-held-out file; GraphRAG's graph genuinely lost them and refused to cite. The
+        judge rewarded refusal over correct citation. The metric is measuring caution, not truth.</li>
+      <li><strong>The meta-finding: preference ≠ correctness.</strong> The no-context model
+        (just the LLM, no retrieved data at all) was picked 72.2% of the time over
+        GraphRAG — a strong win. But when we checked whether its cited paper IDs (PMIDs) were
+        real, only 31.7% actually existed. GraphRAG's cited PMIDs were real
+        66.7% of the time. The LLM judge was fooled by fluent confidence and
+        couldn't detect fabricated citations. This is the entire reason the design uses both
+        subjective preference and deterministic ground-truth checks.</li>
     </ul>
     <div class="callout">
       <span class="callout-label">Bottom line</span>
@@ -532,7 +589,7 @@ User question: {the question}</pre>
 <p class="muted"><strong>Q:</strong> In PharmGKB&#x27;s clinical guidelines, what is the evidence level for the ibuprofen × CYP2C9 association?</p>
 <p class="muted"><strong>Gold:</strong> {&quot;entities&quot;: [&quot;ibuprofen&quot;, &quot;CYP2C9&quot;], &quot;evidence_level&quot;: &quot;1A&quot;, &quot;should_refuse&quot;: false, &quot;answer_summary&quot;: &quot;Evidence level 1A.&quot;}</p>
 <div class='examples'>
-<div class="example"><div class="arm-tag">A0 — no context</div><pre>## CYP2C9 × Ibuprofen — PharmGKB Evidence Level
+<div class="example"><div class="arm-tag">A0 · LLM alone (no context)</div><pre>## CYP2C9 × Ibuprofen — PharmGKB Evidence Level
 
 &gt; ⚠️ **No graph context was retrieved for this query.** The answer below draws on my training knowledge; verify directly at [PharmGKB.org](https://www.pharmgkb.org) before acting on it.
 
@@ -543,7 +600,7 @@ User question: {the question}</pre>
 | **Evidence level** | **1A** (CPIC guideline exists) |
 | **Basis** | CPIC published a guideline for **CYP2C9 and NSAIDs** (including ibuprofen) ~2020, elevating it to the highest tier |
 | **Mechanism** | Ibuprofen is primarily metabolized by CYP2C9; *2 and *3 alleles reduce…</pre></div>
-<div class="example"><div class="arm-tag">A1 — naïve RAG</div><pre>## Ibuprofen × CYP2C9: Evidence Level
+<div class="example"><div class="arm-tag">A1 · LLM + plain-text retrieval</div><pre>## Ibuprofen × CYP2C9: Evidence Level
 
 The retrieved context does **not** contain a PharmGKB clinical annotation specifically linking **ibuprofen** to **CYP2C9**. I cannot report an evidence level for that pairing without fabricating it.
 
@@ -555,10 +612,10 @@ What the context *does* show:
 | **Flurbiprofen** × CYP2C9\*1/\*2/\*3/\*29 | **1A** (Metabolism/PK) | — |
 
 CYP2C8 (not CYP2C9) is the primary enzyme linked to ibuprofen m…</pre></div>
-<div class="example"><div class="arm-tag">A2 — full subgraph</div><pre>The supplied context does not contain any information about **ibuprofen** or **CYP2C9**. The visible graph is an anesthesia-focused subgraph covering volatile anesthetics, succinylcholine, and genes relevant to Malignant Hyperthermia (primarily RYR1, CACNA1S, BCHE, etc.). Neither ibuprofen nor CYP2C9 appear as nodes or in any relationship.
+<div class="example"><div class="arm-tag">A2 · LLM + full subgraph dump</div><pre>The supplied context does not contain any information about **ibuprofen** or **CYP2C9**. The visible graph is an anesthesia-focused subgraph covering volatile anesthetics, succinylcholine, and genes relevant to Malignant Hyperthermia (primarily RYR1, CACNA1S, BCHE, etc.). Neither ibuprofen nor CYP2C9 appear as nodes or in any relationship.
 
 I cannot answer this question from the provided context without risking fabrication. To get the PharmGKB evidence level for the ibuprofen × CYP2C9 association, please consult [PharmGKB directly](https://www.pharmgkb.org) or expand the knowledge graph to inc…</pre></div>
-<div class="example"><div class="arm-tag">A3 — GraphRAG</div><pre>## Ibuprofen × CYP2C9: No Direct Association Found
+<div class="example"><div class="arm-tag">A3 · LLM + GraphRAG (the system)</div><pre>## Ibuprofen × CYP2C9: No Direct Association Found
 
 The supplied context does **not** contain a direct edge between ibuprofen and CYP2C9. Ibuprofen&#x27;s only direct pharmacogene link in the graph is:
 
@@ -576,7 +633,7 @@ This is an associative traversal through an intermediate node, **not** a PharmGK
 <p class="muted"><strong>Q:</strong> A patient is found to carry the rs2108622 variant in CYP4F2. Which class of medications may require dose adjustment, and why?</p>
 <p class="muted"><strong>Gold:</strong> {&quot;entities&quot;: [&quot;rs2108622&quot;, &quot;CYP4F2&quot;, &quot;Vitamin K Antagonists&quot;, &quot;warfarin&quot;], &quot;drug_class&quot;: &quot;Vitamin K Antagonists&quot;, &quot;should_refuse&quot;: false, &quot;answer_summary&quot;: &quot;Vitamin K Antagonists may require dose adjustment because of the CYP4F2 variant.&quot;}</p>
 <div class='examples'>
-<div class="example"><div class="arm-tag">A0 — no context</div><pre>## CYP4F2 rs2108622 (*3 allele) — Clinical Summary
+<div class="example"><div class="arm-tag">A0 · LLM alone (no context)</div><pre>## CYP4F2 rs2108622 (*3 allele) — Clinical Summary
 
 **Drug class affected: Vitamin K antagonists (VKAs), primarily warfarin.**
 
@@ -591,7 +648,7 @@ CYP4F2 hydroxylates and clears hepatic vitamin K₁ (phylloquinone). The rs21086
 ### Dosing implication
 
 *\*3* al…</pre></div>
-<div class="example"><div class="arm-tag">A1 — naïve RAG</div><pre>## CYP4F2 rs2108622 — Dose Adjustment Implications
+<div class="example"><div class="arm-tag">A1 · LLM + plain-text retrieval</div><pre>## CYP4F2 rs2108622 — Dose Adjustment Implications
 
 **Class affected: Vitamin K Antagonists (VKAs)**
 
@@ -604,7 +661,7 @@ CYP4F2 is a key enzyme in hepatic vitamin K catabolism. The rs2108622 (V433M) va
 1. **Lower vitamin K breakdown** → elevated hepatic vitamin K levels
 2. **Greater competition** with VKAs for their target (VKORC1)
 3. Net result: **higher VKA dose…</pre></div>
-<div class="example"><div class="arm-tag">A2 — full subgraph</div><pre>## CYP4F2 rs2108622 — Outside the Current Graph Context
+<div class="example"><div class="arm-tag">A2 · LLM + full subgraph dump</div><pre>## CYP4F2 rs2108622 — Outside the Current Graph Context
 
 **The supplied context does not include CYP4F2 or the rs2108622 variant.** The visible subgraph is scoped to an anesthesia pharmacogenomics seed (RYR1, CACNA1S, BCHE, ABCB1, CYP2E1, and related anesthetic drugs). CYP4F2 is not among the 13 genes currently loaded.
 
@@ -613,7 +670,7 @@ CYP4F2 is a key enzyme in hepatic vitamin K catabolism. The rs2108622 (V433M) va
 **What the graph cannot tell you here:** Any claim about rs2108622 and dose adjustment would draw solely on my training data — not on graph-grounded evidence — which would violate the grounding rule for this assistant.
 
 **For reference (training knowledge, not graph-source…</pre></div>
-<div class="example"><div class="arm-tag">A3 — GraphRAG</div><pre>## CYP4F2 rs2108622 — Vitamin K Antagonists Require Dose Adjustment
+<div class="example"><div class="arm-tag">A3 · LLM + GraphRAG (the system)</div><pre>## CYP4F2 rs2108622 — Vitamin K Antagonists Require Dose Adjustment
 
 **Primary drug class: Vitamin K Antagonists (VKAs)**
 
@@ -633,7 +690,7 @@ CYP4F2 is the primary enzyme responsible for metabolizing **vitamin K1 (phylloqu
 <p class="muted"><strong>Q:</strong> Cite a primary research reference (PMID) supporting the flucloxacillin × HLA-B pharmacogenomic association.</p>
 <p class="muted"><strong>Gold:</strong> {&quot;entities&quot;: [&quot;flucloxacillin&quot;, &quot;HLA-B&quot;], &quot;pmids&quot;: [&quot;19483685&quot;, &quot;30661239&quot;, &quot;30664875&quot;], &quot;should_refuse&quot;: false, &quot;answer_summary&quot;: &quot;Any PMID from the curated list supporting flucloxacillin \u00d7 HLA-B.&quot;}</p>
 <div class='examples'>
-<div class="example"><div class="arm-tag">A0 — no context</div><pre>## Flucloxacillin × HLA-B*57:01
+<div class="example"><div class="arm-tag">A0 · LLM alone (no context)</div><pre>## Flucloxacillin × HLA-B*57:01
 
 &gt; ⚠️ No graph context was retrieved for this query. The citation below comes from general pharmacogenomic knowledge — please verify against the knowledge graph if a graph-grounded answer is required.
 
@@ -643,7 +700,7 @@ The landmark primary reference is:
 **[PMID:19483685]**
 
 This genome-wide association study (GWAS) identified **HLA-B\*57:01** as strongly associated with flucloxacillin-induced cholestatic hepatitis (OR ~80-…</pre></div>
-<div class="example"><div class="arm-tag">A1 — naïve RAG</div><pre>## Flucloxacillin × HLA-B: Primary Reference
+<div class="example"><div class="arm-tag">A1 · LLM + plain-text retrieval</div><pre>## Flucloxacillin × HLA-B: Primary Reference
 
 The retrieved evidence directly supports this association:
 
@@ -654,12 +711,12 @@ The retrieved evidence directly supports this association:
 This PMID (30661239) underpins the PharmGKB-curated relationship between the **HLA-B\*57:03** haplotype and flucloxacillin — the same study also supports associations with HLA-DQA1\*02:01, HLA-DQA1 (gene-level), HLA-DQB1, and HLA-DQB1\*03:03 [PMID:30661239].
 
 A second study [PMID:30664875] corroborates related HLA associations (HLA-C\*06:02, HLA-DQB1, HLA-DQB1\*03:03, HLA-DQB1\*06:02) w…</pre></div>
-<div class="example"><div class="arm-tag">A2 — full subgraph</div><pre>The supplied graph context does not contain any information about **flucloxacillin** or **HLA-B** — both are absent from this anesthesia-focused subgraph (which covers volatile anesthetics, succinylcholine, RYR1, CACNA1S, and related genes).
+<div class="example"><div class="arm-tag">A2 · LLM + full subgraph dump</div><pre>The supplied graph context does not contain any information about **flucloxacillin** or **HLA-B** — both are absent from this anesthesia-focused subgraph (which covers volatile anesthetics, succinylcholine, RYR1, CACNA1S, and related genes).
 
 I cannot cite a PMID for that association from the available context, and I won&#x27;t fabricate one.
 
 **What to do instead:** The flucloxacillin × HLA-B*57:01 (drug-induced liver injury) association is catalogued in PharmGKB and CPIC. Query those databases directly, or ask me again once the relevant nodes (flucloxacillin, HLA-B) have been loaded into the know…</pre></div>
-<div class="example"><div class="arm-tag">A3 — GraphRAG</div><pre>## Flucloxacillin × HLA-B — Not Supported by the Supplied Context
+<div class="example"><div class="arm-tag">A3 · LLM + GraphRAG (the system)</div><pre>## Flucloxacillin × HLA-B — Not Supported by the Supplied Context
 
 The knowledge graph does **not** contain a direct edge between flucloxacillin and HLA-B, and **no PMID is provided** for this association in the retrieved context.
 
@@ -677,7 +734,7 @@ The &quot;shortest path&quot; surfaced is a **3-hop indirect route** (flucloxaci
 <p class="muted"><strong>Q:</strong> According to PharmGKB-curated evidence, is there a clinically meaningful pharmacogenomic association between divalproex sodium and CYP2D6?</p>
 <p class="muted"><strong>Gold:</strong> {&quot;entities&quot;: [&quot;divalproex sodium&quot;, &quot;CYP2D6&quot;], &quot;should_refuse&quot;: false, &quot;expected_negative&quot;: true, &quot;answer_summary&quot;: &quot;No, PharmGKB lists this pair as not associated / ambiguous.&quot;}</p>
 <div class='examples'>
-<div class="example"><div class="arm-tag">A0 — no context</div><pre>## Divalproex Sodium × CYP2D6: PharmGKB Evidence
+<div class="example"><div class="arm-tag">A0 · LLM alone (no context)</div><pre>## Divalproex Sodium × CYP2D6: PharmGKB Evidence
 
 **No retrieved knowledge-graph context was provided for this query**, so I am drawing on general pharmacogenomic knowledge — please verify against the live PharmGKB database.
 
@@ -690,7 +747,7 @@ CYP2D6 is **not** a primary metabolic pathway for valproic acid (the active moie
 | Glucuronidation (dominant) | UGT1A4, UGT1A6, UGT2B7 |
 | β-oxidation | Mitochondrial (POLG-relevant) |
 | Minor CYP oxidation …</pre></div>
-<div class="example"><div class="arm-tag">A1 — naïve RAG</div><pre>## Divalproex Sodium ↔ CYP2D6: PharmGKB Evidence
+<div class="example"><div class="arm-tag">A1 · LLM + plain-text retrieval</div><pre>## Divalproex Sodium ↔ CYP2D6: PharmGKB Evidence
 
 **The retrieved context does not support this association.**
 
@@ -703,12 +760,12 @@ None of the 8 PharmGKB-curated relationships returned mention divalproex sodium 
 - Head and Neck Neoplasms [PMID:33131142]
 
 **What is known from general pharmacology** (outside this retrieval): Valproic acid is primarily metabolized via U…</pre></div>
-<div class="example"><div class="arm-tag">A2 — full subgraph</div><pre>## Divalproex Sodium × CYP2D6: Not Supported by the Available Context
+<div class="example"><div class="arm-tag">A2 · LLM + full subgraph dump</div><pre>## Divalproex Sodium × CYP2D6: Not Supported by the Available Context
 
 The supplied graph is an **anesthesia seed subgraph** and contains neither **divalproex sodium** nor **CYP2D6**. The drugs present are volatile anesthetics (sevoflurane, isoflurane, desflurane, halothane, enflurane, methoxyflurane) and succinylcholine; the genes are anesthesia-relevant (RYR1, CACNA1S, BCHE, ABCB1, CYP2E1, etc.).
 
 Because divalproex sodium and CYP2D6 fall **outside this subgraph**, I cannot make any claim about their association grounded in the provided context. To answer this question accurately, the graph …</pre></div>
-<div class="example"><div class="arm-tag">A3 — GraphRAG</div><pre>## No Evidence Found in This Knowledge Graph
+<div class="example"><div class="arm-tag">A3 · LLM + GraphRAG (the system)</div><pre>## No Evidence Found in This Knowledge Graph
 
 Based on the PharmGKB-curated context provided, **divalproex sodium does not appear anywhere** in the neighbourhood of CYP2D6 (or CYP2A6/CYP2B6). There is no direct or indirect edge connecting divalproex sodium to CYP2D6 in the retrieved subgraph.
 
@@ -722,7 +779,7 @@ The CYP2D6 neighbourhood is densely populated with well-evidenced associations �
 <p class="muted"><strong>Q:</strong> What pharmacogenomic guidelines exist for coenzyme Q10 in PharmGKB? Cite the specific gene-drug interactions if any.</p>
 <p class="muted"><strong>Gold:</strong> {&quot;entities&quot;: [&quot;coenzyme Q10&quot;], &quot;should_refuse&quot;: true, &quot;answer_summary&quot;: &quot;coenzyme Q10 is not in PharmGKB&#x27;s clinical guidelines; appropriate response is to indicate no pharmacogenomic guidelines exist.&quot;}</p>
 <div class='examples'>
-<div class="example"><div class="arm-tag">A0 — no context</div><pre>## CoQ10 Pharmacogenomics in PharmGKB
+<div class="example"><div class="arm-tag">A0 · LLM alone (no context)</div><pre>## CoQ10 Pharmacogenomics in PharmGKB
 
 **No retrieved context was provided for this query**, so I&#x27;m drawing on general knowledge — and importantly, there are meaningful limitations here.
 
@@ -734,7 +791,7 @@ To my knowledge, **PharmGKB does not have any CPIC-level (1A or 1B) clinical pha
 
 | Context | Gene(s) | Relationship |
 |---|-…</pre></div>
-<div class="example"><div class="arm-tag">A1 — naïve RAG</div><pre>## Coenzyme Q10 in PharmGKB — Query Result
+<div class="example"><div class="arm-tag">A1 · LLM + plain-text retrieval</div><pre>## Coenzyme Q10 in PharmGKB — Query Result
 
 **The retrieved context does not contain any pharmacogenomic guidelines or gene-drug interactions for coenzyme Q10 (CoQ10).**
 
@@ -743,7 +800,7 @@ None of the 8 retrieved evidence nodes mention CoQ10, ubiquinone, or related ter
 ### What this likely means
 
 - PharmGKB&#x27;s curated guideline set (CPIC, DPWG, etc.) does **not** currently include a CoQ10 clinical guideline — CoQ10 is a supplement rather than a regulated drug, so…</pre></div>
-<div class="example"><div class="arm-tag">A2 — full subgraph</div><pre>## Coenzyme Q10 — Not in the Supplied Context
+<div class="example"><div class="arm-tag">A2 · LLM + full subgraph dump</div><pre>## Coenzyme Q10 — Not in the Supplied Context
 
 The visible graph does not contain **coenzyme Q10** (ubiquinone/CoQ10) as a drug node, nor are there any gene-drug relationships, variant clusters, or PharmGKB guidelines for it in the current subgraph.
 
@@ -752,7 +809,7 @@ The drugs present in this knowledge graph are limited to **anesthetic agents**:
 - Depolarizing neuromuscular blocker: succinylcholine
 
 I cannot fabricate PharmGKB annotations for CoQ10 that are not grounded in the supplied context. To get accurate Pha…</pre></div>
-<div class="example"><div class="arm-tag">A3 — GraphRAG</div><pre>## Pharmacogenomic Data for Coenzyme Q10 / COQ2 in PharmGKB
+<div class="example"><div class="arm-tag">A3 · LLM + GraphRAG (the system)</div><pre>## Pharmacogenomic Data for Coenzyme Q10 / COQ2 in PharmGKB
 
 Based on the knowledge graph context, **no formal PharmGKB clinical guidelines (e.g., CPIC or DPWG)** exist for coenzyme Q10 itself. However, there are relevant **Level 3 gene-drug interaction annotations** involving the *COQ2* gene:
 
