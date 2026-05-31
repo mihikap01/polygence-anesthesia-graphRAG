@@ -460,6 +460,28 @@ details pre { font-size:12px; margin-top:10px; max-height:400px; overflow:auto; 
   display:flex; align-items:center; justify-content:center; }
 .flow-arrow { text-align:center; color:var(--muted); font-size:16px; line-height:1; }
 .metric-key { color:var(--primary); font-weight:600; }
+/* Table of contents */
+.report-toc {
+  background: var(--card); border: 1px solid var(--border); border-radius: 14px;
+  padding: 18px 22px 14px; box-shadow: var(--soft); margin: 0 0 32px;
+}
+.report-toc h4 {
+  margin: 0 0 10px; font-size: 11px; text-transform: uppercase;
+  letter-spacing: .08em; color: var(--muted); font-weight: 700;
+}
+.report-toc ol { margin: 0; padding-left: 20px; font-size: 14px; }
+.report-toc li { margin: 5px 0; line-height: 1.5; }
+.report-toc a { color: var(--primary); text-decoration: none; }
+.report-toc a:hover { text-decoration: underline; }
+.report-toc .muted { font-weight: 400; font-size: 13px; }
+.report-toc .toc-appendix {
+  margin-top: 10px; padding-top: 10px; border-top: 1px dashed hsl(215 15% 80%);
+}
+.report-toc .toc-appendix ul {
+  margin: 6px 0 0; padding-left: 20px; list-style: none;
+  font-size: 12.5px; color: var(--muted);
+}
+.report-toc .toc-appendix ul li { margin: 3px 0; }
 /* Appendix A — reproduction recipe styling */
 pre.cmd-app {
   background: hsl(215 20% 18%); color: hsl(195 50% 94%);
@@ -801,13 +823,42 @@ def html_abstract(pw: dict, head: dict) -> str:
         retrieval to recover them without graph traversal. We discuss confounds (notably
         partial held-out leakage via <code>relationships.tsv</code>) and propose targeted
         follow-up experiments.</p>
+      <p style="margin-top:14px; padding-top:12px; border-top:1px solid hsl(215 15% 80%); font-size:14px;">
+        <strong>Want to reproduce these results?</strong> Every command, expected output,
+        and source-file link is in <a href="#appendix-a"><strong>Appendix A</strong></a> at
+        the bottom of this report.
+      </p>
     </div>"""
+
+
+def html_toc() -> str:
+    return """
+    <nav class="report-toc">
+      <h4>Contents</h4>
+      <ol>
+        <li><a href="#s1">1. Introduction</a></li>
+        <li><a href="#s2">2. Background</a></li>
+        <li><a href="#s3">3. Methods</a> <span class="muted">— dataset, held-out split, three arms, prompts, hypotheses, metrics</span></li>
+        <li><a href="#s4">4. Results</a> <span class="muted">— pairwise headline, rule-based, rubric, hallucination, per-stratum</span></li>
+        <li><a href="#s5">5. Discussion</a> <span class="muted">— why subgraph RAG did not beat plain-text RAG</span></li>
+        <li><a href="#s6">6. Limitations and threats to validity</a></li>
+        <li><a href="#s7">7. Conclusions and future work</a></li>
+        <li class="toc-appendix"><a href="#appendix-a"><strong>Appendix A. How each metric works + how to reproduce every result</strong></a>
+          <ul>
+            <li><a href="#a-setup">A.1 Setup</a> · <a href="#a-gen">A.2 Generation</a></li>
+            <li><a href="#a-rule">A.3 Rule-based</a> · <a href="#a-pairwise">A.4 Pairwise preference</a></li>
+            <li><a href="#a-rubric">A.5 Rubric ratings</a> · <a href="#a-halluc">A.6 Hallucination</a></li>
+            <li><a href="#a-report">A.7 Aggregate</a> · <a href="#a-code">A.8 Full code reference</a></li>
+          </ul>
+        </li>
+      </ol>
+    </nav>"""
 
 
 def html_introduction() -> str:
     return """
     <span class="section-tag">1 · introduction</span>
-    <h2>1. Introduction</h2>
+    <h2 id="s1">1. Introduction</h2>
     <p>Retrieval-augmented generation (RAG) systems are increasingly proposed for biomedical
       question answering, where the cost of fabricated facts is high. A growing literature argues
       that <em>knowledge-graph</em>-based RAG — retrieving a relevant subgraph instead of text
@@ -825,7 +876,7 @@ def html_introduction() -> str:
 def html_background() -> str:
     return """
     <span class="section-tag">2 · background</span>
-    <h2>2. Background</h2>
+    <h2 id="s2">2. Background</h2>
     <p><strong>RAG architectures.</strong> The classical RAG pipeline chunks text, indexes
       chunks via similarity search, and concatenates the top-K matches into the LLM's prompt.
       <em>Subgraph RAG</em> instead indexes the source data as a knowledge graph: at query time
@@ -1415,7 +1466,7 @@ def html_appendix_a() -> str:
     """Per-metric explanations + step-by-step reproduction with GitHub links."""
     return f"""
     <span class="section-tag">appendix a</span>
-    <h2>Appendix A. How each metric works + how to reproduce every result</h2>
+    <h2 id="appendix-a">Appendix A. How each metric works + how to reproduce every result</h2>
     <p>This appendix is a run-along recipe. Each step shows: what you are computing,
       why we use that metric, the exact command, the expected output, and a link to
       the source file on GitHub. Following A.1 → A.7 in order recreates everything in §4.</p>
@@ -1736,6 +1787,9 @@ def main() -> int:
     # Abstract
     body.append(html_abstract(pw, head))
 
+    # Table of contents — including Appendix A so reproduction is discoverable
+    body.append(html_toc())
+
     # Notation / reading guide
     body.append(html_glossary())
 
@@ -1746,7 +1800,7 @@ def main() -> int:
     body.append(html_background())
 
     # 3. Methods (rolls up dataset / split / arms / prompts / questions / hypotheses / measurement)
-    body.append('<span class="section-tag">3 · methods</span><h2>3. Methods</h2>')
+    body.append('<span class="section-tag">3 · methods</span><h2 id="s3">3. Methods</h2>')
     body.append('<h3 id="m-data">3.1 Dataset</h3>')
     body.append(html_dataset_body(ev_dist))
     body.append('<h3 id="m-split">3.2 Held-out split</h3>')
@@ -1768,7 +1822,7 @@ def main() -> int:
     body.append(html_metrics_body())
 
     # 4. Results
-    body.append('<span class="section-tag">4 · results</span><h2>4. Results</h2>')
+    body.append('<span class="section-tag">4 · results</span><h2 id="s4">4. Results</h2>')
     body.append('<h3 id="r-pairwise">4.1 Primary outcome — blinded pairwise preference (n=187)</h3>')
     body.append('<p>For each question, the judge (Claude Haiku 4.5) sees both answers with arm labels stripped and presentation order randomised, then picks the preferred answer or "tie." H1 required A3 to win more than 55% of decisive comparisons with sign-test p&lt;0.05.</p>')
     body.append('<p class="muted" style="font-size:12px;margin-bottom:2px;">Table 4. Headline pairwise preference results.</p>')
@@ -1796,7 +1850,7 @@ def main() -> int:
     body.append(html_per_stratum(pps, pwps))
 
     # 5. Discussion
-    body.append('<span class="section-tag">5 · discussion</span><h2>5. Discussion</h2>')
+    body.append('<span class="section-tag">5 · discussion</span><h2 id="s5">5. Discussion</h2>')
     body.append('<h3 id="d-h1">5.1 Why subgraph RAG did not beat plain-text RAG</h3>')
     body.append(html_findings(pw, pwps, head))
     if any(rub.get(a, {}).get("n") for a in ARMS) and hr.get("questions_covered"):
@@ -1827,7 +1881,7 @@ def main() -> int:
     body.append('<p>PharmGKB\'s <code>clinicalVariants.tsv</code> is heavily denormalised: a single row routinely contains variant + gene + evidence level + drugs + phenotypes. "Multi-hop" facts that would require graph traversal in a normalised schema are recoverable in a single text chunk by any sensible text retriever. We conjecture that the absence of a measured benefit for the graph layer in this evaluation reflects this denormalisation, not a deficiency in subgraph RAG as an approach. Domains whose data is genuinely fragmented across documents (e.g. drug-drug interaction networks, citation graphs, multi-source knowledge bases) would be expected to differentiate the approaches more sharply.</p>')
 
     # 6. Limitations
-    body.append('<span class="section-tag">6 · limitations</span><h2>6. Limitations and threats to validity</h2>')
+    body.append('<span class="section-tag">6 · limitations</span><h2 id="s6">6. Limitations and threats to validity</h2>')
     body.append('<p>The following limitations and protocol deviations should be borne in mind when reading the headline result.</p>')
     body.append('<h3 id="l-gen">6.1 Generator and judge configuration</h3>')
     body.append("""<p>The pre-registration named Claude Opus as the generator; we used Claude Sonnet 4
@@ -1864,7 +1918,7 @@ def main() -> int:
     body.append(html_examples(answers_by_qid_arm, questions, example_qids))
 
     # 7. Conclusions and future work
-    body.append('<span class="section-tag">7 · conclusions</span><h2>7. Conclusions and future work</h2>')
+    body.append('<span class="section-tag">7 · conclusions</span><h2 id="s7">7. Conclusions and future work</h2>')
     body.append('<p>On a held-out PharmGKB benchmark, with Claude Sonnet as the generator and Claude Haiku as the judge, the subgraph-RAG system we evaluated did not outperform a strong plain-text RAG baseline on blinded pairwise preference (49% A3-preferred, p=0.83). Across four independent metric families — preference, deterministic rule-based, anchored rubric ratings, and merged-claim hallucination — the no-context model received the highest judge ratings despite fabricating cited PMIDs at roughly twice the rate of subgraph RAG. The graph layer\'s one consistent advantage was appropriate refusal on out-of-distribution queries.</p>')
     body.append('<p>The most parsimonious explanation for the null primary result is that PharmGKB\'s row-level denormalisation packs ostensibly multi-hop facts into single text chunks, allowing strong text similarity to recover them. The result therefore says something specific about <em>this domain</em> (and arguably about any heavily denormalised knowledge graph) rather than something general about subgraph RAG.</p>')
     body.append('<h3 id="c-next">7.1 Targeted follow-up experiments</h3>')
