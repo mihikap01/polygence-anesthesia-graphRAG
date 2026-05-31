@@ -29,6 +29,12 @@ if (existsSync(evalReport)) {
   cpSync(evalReport, join(root, "public", "eval-report.html"));
 }
 
+// 1c. Copy the architecture page so it's served at /architecture.html.
+const archPage = join(root, "..", "architecture.html");
+if (existsSync(archPage)) {
+  cpSync(archPage, join(root, "public", "architecture.html"));
+}
+
 // 2. Move API routes aside so Next doesn't try to prerender them.
 let stashed = false;
 if (existsSync(apiDir)) {

@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Polygence GraphRAG — code architecture</title>
+<meta name="author" content="Mihika Pall">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: hsl(40 30% 98%);
+    --fg: hsl(215 20% 18%);
+    --muted: hsl(215 15% 45%);
+    --card: #fff;
+    --primary: hsl(195 35% 42%);
+    --primary-bg: hsl(195 50% 95%);
+    --secondary: hsl(165 35% 45%);
+    --secondary-bg: hsl(165 40% 95%);
+    --accent: hsl(40 70% 50%);
+    --accent-bg: hsl(40 70% 94%);
+    --border: hsl(215 15% 88%);
+    --soft: 0 2px 12px -2px rgba(30,50,80,.08), 0 1px 3px -1px rgba(30,50,80,.04);
+    --gentle: 0 4px 20px -4px rgba(30,50,80,.10), 0 2px 6px -2px rgba(30,50,80,.05);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--fg);
+    font-family: Inter, system-ui, -apple-system, sans-serif;
+    line-height: 1.6; font-size: 15px;
+  }
+  .wrap { max-width: 1040px; margin: 0 auto; padding: 48px 24px 64px; }
+  .header { padding: 0 0 32px; border-bottom: 1px solid var(--border); margin-bottom: 36px; }
+  .venue { font-size: 11px; text-transform: uppercase; letter-spacing: .12em; color: var(--muted); margin-bottom: 14px; }
+  h1 { font-size: 30px; font-weight: 600; letter-spacing: -.02em; margin: 0 0 8px; line-height: 1.2; }
+  .byline { font-size: 14px; color: var(--muted); }
+  .byline strong { color: var(--fg); }
+  h2 {
+    font-size: 20px; margin: 48px 0 14px; font-weight: 600;
+    letter-spacing: -.01em; padding-bottom: 6px; border-bottom: 2px solid var(--primary-bg);
+  }
+  h3 { font-size: 16px; margin: 28px 0 8px; font-weight: 600; }
+  .muted { color: var(--muted); }
+  code, pre { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 13px; }
+  code { background: var(--primary-bg); padding: 1px 6px; border-radius: 5px; color: var(--fg); }
+  pre {
+    background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+    padding: 16px; overflow-x: auto; box-shadow: var(--soft);
+    font-size: 12.5px; line-height: 1.5; margin: 14px 0;
+    white-space: pre; color: var(--fg);
+  }
+  .lede {
+    background: linear-gradient(135deg, hsl(195 50% 94%), hsl(150 40% 95%));
+    border: 1px solid var(--border); border-radius: 16px;
+    padding: 22px 26px; margin: 0 0 28px; box-shadow: var(--gentle);
+    font-size: 15px;
+  }
+  .lede p { margin: 8px 0; }
+  .lede strong { color: var(--fg); }
+  table {
+    width: 100%; border-collapse: collapse; margin: 14px 0;
+    background: var(--card); border-radius: 12px; overflow: hidden;
+    box-shadow: var(--soft); font-size: 14px;
+  }
+  th, td { padding: 9px 14px; text-align: left; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { background: var(--primary-bg); font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); font-weight: 600; }
+  tr:last-child td { border-bottom: none; }
+  .pill {
+    display: inline-block; padding: 2px 10px; border-radius: 999px;
+    font-size: 11px; font-weight: 500;
+    background: var(--primary-bg); color: var(--primary);
+    margin-right: 6px; margin-bottom: 4px;
+  }
+  .pill-warn { background: var(--accent-bg); color: var(--accent); }
+  .pill-good { background: var(--secondary-bg); color: var(--secondary); }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 14px 0; }
+  .card {
+    background: var(--card); border: 1px solid var(--border); border-radius: 14px;
+    padding: 16px 18px; box-shadow: var(--soft);
+  }
+  .card h4 { margin: 0 0 6px; font-size: 14px; font-weight: 600; }
+  .card p { margin: 4px 0; font-size: 13.5px; color: var(--muted); }
+  .card .meta { font-size: 11px; color: var(--muted); margin-top: 6px; font-family: 'JetBrains Mono', monospace; }
+  .toc {
+    background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+    padding: 14px 20px; box-shadow: var(--soft); margin: 0 0 28px;
+  }
+  .toc h4 { margin: 0 0 8px; font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 700; }
+  .toc ol { margin: 0; padding-left: 22px; font-size: 14px; column-count: 2; column-gap: 24px; }
+  .toc a { color: var(--primary); text-decoration: none; }
+  .toc a:hover { text-decoration: underline; }
+  .nav-links { display: flex; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
+  .nav-links a {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 5px 12px; border-radius: 999px;
+    border: 1px solid var(--border); background: var(--card);
+    font-size: 12px; color: var(--muted); text-decoration: none;
+    transition: all 0.15s;
+  }
+  .nav-links a:hover { color: var(--primary); border-color: var(--primary); }
+  footer {
+    color: var(--muted); font-size: 12px; margin-top: 64px;
+    padding-top: 24px; border-top: 1px solid var(--border);
+    text-align: center;
+  }
+  .diagram {
+    background: var(--card); border: 1px solid var(--border); border-radius: 14px;
+    padding: 28px 24px; margin: 18px 0; box-shadow: var(--soft);
+    overflow-x: auto;
+  }
+  .diagram pre { background: transparent; border: none; box-shadow: none; padding: 0; margin: 0; font-size: 12.5px; color: var(--fg); }
+  @media (max-width: 700px) { .grid-2 { grid-template-columns: 1fr; } .toc ol { column-count: 1; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<div class="header">
+  <div class="venue">Polygence pharmacogenomic graph-RAG · code architecture</div>
+  <h1>How the system is built</h1>
+  <p class="byline">Author: <strong>Mihika Pall</strong>. A walkthrough of the codebase — what each module does, how the pieces connect, and how the live demo and evaluation framework relate.</p>
+  <div class="nav-links">
+    <a href="https://polygence-pubmed-graphrag.web.app">Live demo →</a>
+    <a href="/eval-report">Eval report →</a>
+    <a href="https://github.com/mihikap01/polygence-anesthesia-graphRAG">GitHub →</a>
+  </div>
+</div>
+
+<div class="lede">
+  <p>The project ships <strong>two parallel surfaces over the same PharmGKB pharmacogenomic knowledge graph</strong>:</p>
+  <p>(1) <strong>An interactive web app</strong> — a Cytoscape-rendered graph with Explain (click a node/edge) and Chat (free-form question) panels. Both panels do GraphRAG retrieval and feed the result to an LLM (Claude CLI locally, Gemini via Firebase Cloud Function in production).</p>
+  <p>(2) <strong>A reproducible evaluation framework</strong> — 187 held-out questions × 3 retrieval conditions (no-context, plain-text RAG, subgraph RAG) × 4 metric families (rule-based, pairwise preference, rubric, hallucination via merged-claim segmentation). All scripts and raw evidence committed.</p>
+</div>
+
+<div class="toc">
+  <h4>Contents</h4>
+  <ol>
+    <li><a href="#sys">1. System overview</a></li>
+    <li><a href="#pipe">2. Data pipeline</a></li>
+    <li><a href="#web">3. Web app architecture</a></li>
+    <li><a href="#deploy">4. Two deploy targets</a></li>
+    <li><a href="#eval">5. Eval framework</a></li>
+    <li><a href="#flow">6. End-to-end flow for one question</a></li>
+    <li><a href="#tree">7. File tree</a></li>
+    <li><a href="#stack">8. Tech stack</a></li>
+  </ol>
+</div>
+
+<h2 id="sys">1. System overview</h2>
+
+<div class="diagram">
+<pre>
+                                   ┌───────────────────────────┐
+                                   │  PharmGKB source TSVs     │
+                                   │  • clinicalVariants.tsv   │   raw curated data
+                                   │  • relationships.tsv      │   (5.2k + 127k rows)
+                                   │  • drugs / genes / phens  │
+                                   └─────────────┬─────────────┘
+                                                 │
+                                                 ▼
+                                   ┌───────────────────────────┐
+                                   │  preprocess/build_graph.py │   Python stdlib, no deps
+                                   │  • parse + normalise IDs   │   produces 3,213 nodes
+                                   │  • collapse rsIDs → clusters│  / 8,024 edges
+                                   │  • inject drug-class layer │
+                                   └─────────────┬─────────────┘
+                                                 │
+                                ┌────────────────┼─────────────────┐
+                                ▼                ▼                 ▼
+                       data/graph.json   data/seed_anesthesia.json data/search_index.json
+                                                │
+                ┌───────────────────────────────┼──────────────────────────────┐
+                ▼                                                              ▼
+   ┌────────────────────────────────┐                       ┌──────────────────────────────────┐
+   │  WEB APP (Next.js 14)          │                       │  EVAL FRAMEWORK (Python)         │
+   │  ─────────────────             │                       │  ───────────────────             │
+   │  • Cytoscape graph canvas      │                       │  • rebuild_heldout.py (split)    │
+   │  • LeftSidebar — search/filter │                       │  • generate_questions.py (187)   │
+   │  • RightSidebar — Explain/Chat │                       │  • arms.py — A0/A1/A3 wrappers   │
+   │  • API routes (server build)   │                       │  • run.py — 4 × 187 generations  │
+   │  • Static export (BYOK)        │                       │  • grade.py — rule-based metrics │
+   │                                │                       │  • judge.py — pairwise preference│
+   │  Deployed: Firebase Hosting    │                       │  • judge_rubric.py — F/C/CS 1-5  │
+   │  Live: *.web.app               │                       │  • segment.py — hallucination    │
+   └────────────────────────────────┘                       │  • report.py — eval-report.html  │
+                                                            └──────────────────────────────────┘
+</pre>
+</div>
+
+<h2 id="pipe">2. Data pipeline</h2>
+
+<p>One script (<code>preprocess/build_graph.py</code>, Python stdlib only) turns the six raw PharmGKB TSVs into three JSON artifacts under <code>data/</code>:</p>
+
+<table>
+  <thead><tr><th>File</th><th>Size</th><th>What's in it</th><th>Consumers</th></tr></thead>
+  <tbody>
+    <tr><td><code>graph.json</code></td><td>~2 MB</td><td>3,213 nodes (drug / gene / variant_cluster / drug_class / phenotype) + 8,024 typed edges with evidence levels, PMIDs, and CRITICAL flags</td><td>Web app graph canvas, Explain/Chat retrieval; eval A3 (subgraph RAG)</td></tr>
+    <tr><td><code>seed_anesthesia.json</code></td><td>~28 KB</td><td>The 36-node anesthesia / MH demo subgraph used as the default view</td><td>Web app initial load</td></tr>
+    <tr><td><code>search_index.json</code></td><td>~302 KB</td><td>Flat list of {id, label, type, alt} for entity-linking and autocomplete</td><td>LeftSidebar search, eval A3 entity-linker</td></tr>
+  </tbody>
+</table>
+
+<h3>Held-out variant of the pipeline (for eval fairness)</h3>
+<p>The same build script honours two env vars to produce a reduced graph for the evaluation:</p>
+<pre>HELDOUT_VARIANTS=eval/heldout_variant_hashes.txt \
+HELDOUT_OUTPUT=graph_heldout.json \
+python3 preprocess/build_graph.py
+# → data/graph_heldout.json (3,203 nodes, 7,972 edges)
+# → data/search_index_heldout.json (same shape, reduced)
+# → data/seed_anesthesia_heldout.json</pre>
+
+<h2 id="web">3. Web app architecture</h2>
+
+<p>Next.js 14 App Router. TypeScript throughout. Cytoscape for the graph canvas, Tailwind + small custom CSS for the rest. State held in a Zustand store. Two build targets: server (API routes active, Claude CLI) and static export (BYOK to the user's LLM key).</p>
+
+<div class="grid-2">
+  <div class="card">
+    <h4>Frontend modules</h4>
+    <p><code>app/page.tsx</code> — three-pane layout, loads seed graph on mount.</p>
+    <p><code>app/about/page.tsx</code> — about + author + links.</p>
+    <p><code>components/GraphCanvas.tsx</code> — Cytoscape (fcose layout), click handlers, filter classes.</p>
+    <p><code>components/LeftSidebar.tsx</code> — entity search + filter toggles + dataset loaders.</p>
+    <p><code>components/RightSidebar.tsx</code> — Explain panel (click-driven) and Chat panel (question-driven). Includes the "Context sent to model" viewer.</p>
+    <p><code>components/ApiKeyModal.tsx</code> — BYOK modal for static deploys.</p>
+    <p><code>components/ui/{Button,Input,Dialog}.tsx</code> — Radix UI + CVA primitives.</p>
+  </div>
+  <div class="card">
+    <h4>Graph / LLM lib</h4>
+    <p><code>lib/graph/types.ts</code> — Graph, GraphNode, GraphEdge, SearchHit.</p>
+    <p><code>lib/graph/ops.ts</code> — pure ops (neighbourhood, applyFilters), browser-safe.</p>
+    <p><code>lib/graph/loader.ts</code> — server-side fs reads of data/*.json.</p>
+    <p><code>lib/graph/runtime.ts</code> — process-wide cache for the search index.</p>
+    <p><code>lib/graph/client-loader.ts</code> — browser fetch of static JSONs (BYOK mode).</p>
+    <p><code>lib/graph/data-api.ts</code> — facade: API route vs. in-browser ops by env.</p>
+    <p><code>lib/graph/retrieve.ts</code> — <strong>GraphRAG core</strong>: entity link → neighbourhoods → BFS shortest paths → structured packet.</p>
+    <p><code>lib/llm/{index,openai,claude-cli,prompts}.ts</code> — provider abstraction.</p>
+    <p><code>lib/llm/browser.ts</code> + <code>browser-pipeline.ts</code> — BYOK browser-side LLM calls.</p>
+  </div>
+</div>
+
+<h3>API routes (active only in server build)</h3>
+<table>
+  <thead><tr><th>Route</th><th>What it does</th></tr></thead>
+  <tbody>
+    <tr><td><code>/api/graph</code></td><td>Returns seed view or N-hop neighbourhood around a seed node.</td></tr>
+    <tr><td><code>/api/search</code></td><td>Returns the search index for autocomplete.</td></tr>
+    <tr><td><code>/api/explain</code></td><td>Given (kind, id), runs <code>nodeContext</code>/<code>edgeContext</code> retrieval → LLM → returns answer + retrieved subgraph.</td></tr>
+    <tr><td><code>/api/chat</code></td><td>Given a question, runs <code>retrieveForQuestion</code> → LLM → returns answer + retrieval (entities, paths, subgraph size).</td></tr>
+  </tbody>
+</table>
+
+<h2 id="deploy">4. Two deploy targets</h2>
+
+<div class="grid-2">
+  <div class="card">
+    <h4><span class="pill">Local dev</span></h4>
+    <p><strong><code>npm run dev</code> → http://localhost:3000</strong></p>
+    <p>Server build with API routes active. <code>LLM_PROVIDER=claude-cli</code> in <code>.env.local</code> — every Explain/Chat call spawns <code>claude -p</code> headlessly, reusing your Claude Code auth. No API keys needed.</p>
+  </div>
+  <div class="card">
+    <h4><span class="pill pill-good">Firebase Hosting</span></h4>
+    <p><strong><code>npm run deploy:firebase</code></strong></p>
+    <p>Static export (<code>output: "export"</code>) shipped to <code>polygence-pubmed-graphrag.web.app</code>. The retrieval pipeline runs in the browser (graph.json fetched once + cached). LLM calls go to <code>/api/llm</code> which is rewritten by Hosting to a Firebase Cloud Function (<code>functions/index.js</code>) that calls Gemini with <code>GEMINI_KEY</code> stored as a Firebase secret. The key never enters the JS bundle.</p>
+    <p>Alternatively the user can paste their own OpenAI/Anthropic/Gemini/DeepSeek key in the in-app modal → browser calls the provider directly.</p>
+  </div>
+</div>
+
+<h2 id="eval">5. Eval framework</h2>
+
+<p>An end-to-end Python pipeline under <code>eval/</code>. Every step is deterministic (fixed seeds), resumable, and reproducible from the committed scripts + raw evidence.</p>
+
+<div class="diagram">
+<pre>
+   1. SPLIT                         2. QUESTION SET                      3. INDEXES
+   ────────────                     ───────────────                      ──────────
+   rebuild_heldout.py               generate_questions.py                a1_index.py
+   30% of 1A/1B/2A/2B rows held    187 questions across 8 strata        BM25 + MiniLM dense
+   out (seed=42)                    (seed=7) with gold records           over reduced TSVs
+
+                                    │
+                                    ▼
+                       ┌──────────────────────────────────────┐
+                       │  4. GENERATION  (run.py + arms.py)   │
+                       │  3 arms × 187 Qs = 561 generations   │
+                       │  All via `claude -p --model sonnet`  │
+                       │                                       │
+                       │  A0 — no context                      │
+                       │  A1 — top-8 RRF-fused chunks          │
+                       │  A3 — entity-link + neighbourhoods    │
+                       │       + BFS shortest paths            │
+                       │       (retrieve_py.py = Python port   │
+                       │        of web/lib/graph/retrieve.ts)  │
+                       └─────────────────┬────────────────────┘
+                                         │
+        ┌─────────────────┬──────────────┼─────────────────┬──────────────────┐
+        ▼                 ▼              ▼                 ▼                  ▼
+   grade.py            judge.py     judge_rubric.py    segment.py        (audit)
+   ─────────           ────────     ──────────────     ──────────
+   Rule-based:         Pairwise     1-5 anchored       Merged-claim
+   PMID-exists,        preference   rubric ratings:    extraction
+   entity recall,      A3 vs A1,    Faithfulness,      → support
+   evidence-level      A3 vs A0     Completeness,      vs ground
+   exact-match,        (Haiku,      Clinical-          truth → per-arm
+   refusal correctness blinded)     soundness          hallucination rate
+
+                                         │
+                                         ▼
+                              report.py → eval/report.html
+                              + eval/results.json (machine-readable)
+</pre>
+</div>
+
+<table>
+  <thead><tr><th>Script</th><th>Output</th><th>Wall time</th><th>Approx cost</th></tr></thead>
+  <tbody>
+    <tr><td><code>rebuild_heldout.py</code></td><td>heldout_variants.tsv + graph_heldout.json</td><td>~5 s</td><td>0</td></tr>
+    <tr><td><code>generate_questions.py</code></td><td>questions.jsonl (187 records)</td><td>~3 s</td><td>0</td></tr>
+    <tr><td><code>a1_index.py</code></td><td>cached BM25 + dense embeddings</td><td>~20 s</td><td>0 (local model)</td></tr>
+    <tr><td><code>run.py --model sonnet</code></td><td>answers.jsonl (561+ records)</td><td>~3-4 h</td><td>~$25</td></tr>
+    <tr><td><code>grade.py</code></td><td>scores.jsonl</td><td>~3 s</td><td>0</td></tr>
+    <tr><td><code>judge.py --workers 6</code></td><td>judgments.jsonl (374 pairwise)</td><td>~20 min</td><td>~$7</td></tr>
+    <tr><td><code>judge_rubric.py --workers 8</code></td><td>rubric.jsonl (~750 records)</td><td>~30 min</td><td>~$9</td></tr>
+    <tr><td><code>segment.py --workers 4</code></td><td>segments.jsonl (~185 records)</td><td>~40 min</td><td>~$3</td></tr>
+    <tr><td><code>report.py</code></td><td>report.html + results.json</td><td>~1 s</td><td>0</td></tr>
+    <tr><td><strong>Total</strong></td><td></td><td><strong>~5 h</strong></td><td><strong>~$45</strong></td></tr>
+  </tbody>
+</table>
+
+<h2 id="flow">6. End-to-end flow for one question</h2>
+
+<p>To make the abstraction concrete, here's what happens when a user asks <em>"Why is sevoflurane risky for malignant hyperthermia?"</em> on the live web app:</p>
+
+<div class="diagram">
+<pre>
+1. Browser (RightSidebar Chat panel)
+   user types question → fetch POST /api/llm   (BYOK build via Firebase rewrite)
+
+2. Firebase Hosting (firebase.json rewrite)
+   /api/llm → Cloud Function `ask` (us-central1)
+
+3. Browser-side retrieval — BEFORE the POST, runs lib/graph/retrieve.ts:
+   ┌──────────────────────────────────────────────────────────┐
+   │ a) link_entities(question, graph)                         │
+   │    → fuzzy match against 3,213 nodes via Fuse.js          │
+   │    → finds: sevoflurane (drug), Malignant Hyperthermia    │
+   │      (phenotype), isoflurane (drug, fuzzy-match noise)    │
+   │                                                            │
+   │ b) For each linked entity: neighborhood(graph, [id], 1)    │
+   │    → BFS over adjacency list, 1 hop                        │
+   │    → ~22 edges connecting them to RYR1, succinylcholine,  │
+   │      Volatile Anesthetics class, etc.                      │
+   │                                                            │
+   │ c) shortest_path between every pair of linked entities     │
+   │    → BFS, max 4 hops, preferring CRITICAL / L1A edges      │
+   │    → 3 paths surfaced                                      │
+   │                                                            │
+   │ d) Render as structured text:                              │
+   │    ENTITIES IDENTIFIED:                                    │
+   │      • sevoflurane (drug) — matched "sevoflurane"          │
+   │      • Malignant Hyperthermia (phenotype) — ...            │
+   │    DIRECT NEIGHBOURHOOD OF sevoflurane:                    │
+   │      - sevoflurane --is linked to risk of[L1A, CRITICAL]   │
+   │        --&gt; RYR1                                           │
+   │      - sevoflurane --can trigger[L1A]--&gt; MH               │
+   │      - sevoflurane --belongs to drug class--&gt; Volatile... │
+   │    SHORTEST REASONING PATHS:                               │
+   │      sevoflurane → RYR1 → MH (2 hops, CRITICAL)            │
+   └──────────────────────────────────────────────────────────┘
+
+4. POST /api/llm with {systemPrompt, userPrompt} where userPrompt =
+   structured context block + the original question.
+
+5. Cloud Function (functions/index.js)
+   • Origin check (only *.web.app + localhost allowed)
+   • Per-IP rate limit (in-memory, 20/min/instance)
+   • Forwards to api.deepseek.com or generativelanguage.googleapis.com
+     with the secret key
+
+6. Response flows back through the Cloud Function → browser
+   • RightSidebar renders the answer with PMIDs as link chips
+   • "Context sent to model" panel shows the exact prompt for inspection
+</pre>
+</div>
+
+<h2 id="tree">7. File tree</h2>
+
+<pre>polygence-anesthesia-graphRAG/
+├── README.md                       Top-level docs (start here)
+├── CLAUDE.md                       Quick reference for AI coding assistants
+├── architecture.html               This page
+├── eval-explainer.html             Visual one-pager of the eval methodology
+├── firebase.json + .firebaserc     Firebase Hosting + Functions config
+│
+├── *.tsv                           Raw PharmGKB exports (chemicals/drugs/genes/
+│                                   phenotypes/clinicalVariants/relationships)
+├── preprocess/
+│   └── build_graph.py              TSV → graph.json + seed + search_index
+├── data/                           (gitignored — regenerable from the script)
+│   ├── graph.json                  Full graph (3,213 nodes / 8,024 edges)
+│   ├── seed_anesthesia.json        Demo subgraph (36 nodes / 62 edges)
+│   ├── search_index.json           Flat entity index
+│   └── *_heldout.json              Same artifacts minus the eval held-out rows
+│
+├── functions/
+│   ├── index.js                    Cloud Function /api/llm → Gemini
+│   └── package.json                Node 20, firebase-functions ^5
+│
+├── web/                            The Next.js 14 + TS app
+│   ├── app/
+│   │   ├── page.tsx                Home: three-pane layout
+│   │   ├── about/page.tsx          About + links
+│   │   └── api/{chat,explain,graph,search}/route.ts   Server build only
+│   ├── components/
+│   │   ├── GraphCanvas.tsx         Cytoscape (fcose) renderer
+│   │   ├── LeftSidebar.tsx         Search + filters + load
+│   │   ├── RightSidebar.tsx        Explain + Chat panels
+│   │   ├── ApiKeyModal.tsx         BYOK modal (static deploys)
+│   │   └── ui/{Button,Dialog,Input}.tsx   Radix primitives
+│   ├── lib/
+│   │   ├── graph/                  GraphRAG core (TS port lives in eval/ too)
+│   │   ├── llm/                    Provider abstraction (Claude CLI / OpenAI / browser)
+│   │   ├── api-key.ts              localStorage helpers for BYOK
+│   │   ├── store.ts                Zustand client store
+│   │   └── cn.ts                   className helper
+│   ├── public/
+│   │   ├── data/*.json             Copied from ../data at build:firebase time
+│   │   ├── eval-report.html        Copied from ../eval/report.html
+│   │   └── architecture.html       Copied from ../architecture.html
+│   ├── scripts/
+│   │   ├── build-firebase.mjs      Static export (stashes app/api during build)
+│   │   └── deploy-firebase.mjs     Hosting + Functions in one shot
+│   └── next.config.mjs             Conditional output:export when BYOK=1
+│
+├── scripts/                        Wrappers at repo root, runnable from anywhere
+│   ├── install.sh                  npm install in web/ + functions/
+│   ├── dev.sh                      Local Next.js (Claude CLI)
+│   ├── build-firebase.sh           Static build only
+│   ├── set-gemini-key.sh           Store GEMINI_KEY secret (one-time)
+│   └── deploy-firebase.sh          Build + deploy hosting + functions
+│
+└── eval/                           Reproducible evaluation framework
+    ├── README.md                   Reproducer
+    ├── preregistration.md          Frozen hypotheses + decision rules
+    ├── rebuild_heldout.py          30% deterministic split (seed=42)
+    ├── generate_questions.py       8-stratum templates → 187 questions
+    ├── retrieve_py.py              Faithful Python port of lib/graph/retrieve.ts
+    ├── a1_index.py + a1_retrieve.py  BM25+dense steelman for A1
+    ├── arms.py                     Per-arm Claude CLI wrappers
+    ├── run.py                      Driver: 3 arms × 187 Qs (resumable)
+    ├── grade.py                    Rule-based metrics
+    ├── judge.py                    Blinded pairwise preference (Haiku)
+    ├── judge_rubric.py             F/C/CS 1-5 ratings
+    ├── segment.py                  Merged-claim hallucination
+    ├── report.py                   eval/report.html generator
+    ├── questions.jsonl             187 questions + gold (committed)
+    ├── answers.jsonl               748 LLM responses (committed)
+    ├── judgments.jsonl             374 pairwise judgments
+    ├── scores.jsonl                Rule-based metrics
+    ├── rubric.jsonl                F/C/CS ratings
+    ├── segments.jsonl              Merged-claim records
+    └── report.html, results.json   Final outputs</pre>
+
+<h2 id="stack">8. Tech stack</h2>
+
+<table>
+  <thead><tr><th>Layer</th><th>Tools</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Preprocessing</strong></td><td>Python 3 stdlib only (no pip deps) — <code>build_graph.py</code> is ~500 lines, hand-written parser</td></tr>
+    <tr><td><strong>Frontend</strong></td><td><span class="pill">Next.js 14</span> <span class="pill">TypeScript 5.5</span> <span class="pill">React 18</span> <span class="pill">Tailwind 3.4</span> <span class="pill">Cytoscape.js (fcose layout)</span> <span class="pill">Zustand 4</span> <span class="pill">Fuse.js</span> <span class="pill">Radix UI Dialog/Slot</span> <span class="pill">CVA</span> <span class="pill">lucide-react</span></td></tr>
+    <tr><td><strong>Backend (local)</strong></td><td>Next.js API routes · Node <code>child_process</code> spawning <code>claude -p</code></td></tr>
+    <tr><td><strong>Backend (deployed)</strong></td><td><span class="pill pill-good">Firebase Hosting</span> <span class="pill pill-good">Cloud Functions v2 (Node 20)</span> <span class="pill pill-good">Secret Manager (GEMINI_KEY)</span></td></tr>
+    <tr><td><strong>LLM providers</strong></td><td>Default Gemini 2.5 Flash via Cloud Function proxy; BYOK browser-side for OpenAI / Anthropic / Gemini / DeepSeek; Claude Code CLI for local dev</td></tr>
+    <tr><td><strong>Eval pipeline</strong></td><td>Python 3.12 · <code>rank_bm25</code> · <code>sentence-transformers</code> (all-MiniLM-L6-v2, local) · <code>rapidfuzz</code> · Claude CLI for generation and judging · stdlib for everything else</td></tr>
+    <tr><td><strong>Evaluation models</strong></td><td>Generator: Claude Sonnet 4 · Judge: Claude Haiku 4.5 (cross-size within Claude)</td></tr>
+  </tbody>
+</table>
+
+<footer>
+  Author: <strong>Mihika Pall</strong> · Polygence research mentorship program 2026 · Data: <a href="https://www.pharmgkb.org/" target="_blank">PharmGKB</a> · Code: <a href="https://github.com/mihikap01/polygence-anesthesia-graphRAG" target="_blank">github.com/mihikap01/polygence-anesthesia-graphRAG</a>
+</footer>
+
+</div>
+</body>
+</html>

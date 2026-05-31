@@ -1,31 +1,96 @@
 # Polygence Anesthesia GraphRAG
 
-An interactive biomedical knowledge-graph web app for pharmacogenomic and
-anesthesia-related risk reasoning. Built from the PharmGKB-style TSV
-exports in this repo.
+> An interactive biomedical knowledge-graph web app for pharmacogenomic and
+> anesthesia-related risk reasoning, plus a reproducible evaluation framework
+> testing whether the graph layer actually helps the LLM.
+>
+> **Author:** Mihika Pall · Polygence research mentorship program (2026)
 
-Two grounded reasoning surfaces over the graph:
+### Links
+
+| | |
+| --- | --- |
+| 🌐 **Live demo** | [polygence-pubmed-graphrag.web.app](https://polygence-pubmed-graphrag.web.app) |
+| 📊 **Eval report** | [polygence-pubmed-graphrag.web.app/eval-report](https://polygence-pubmed-graphrag.web.app/eval-report) |
+| 🏗 **Architecture page** | [polygence-pubmed-graphrag.web.app/architecture](https://polygence-pubmed-graphrag.web.app/architecture) · [view raw HTML in repo](./architecture.html) |
+| 💾 **Source** | [github.com/mihikap01/polygence-anesthesia-graphRAG](https://github.com/mihikap01/polygence-anesthesia-graphRAG) |
+
+---
+
+## What this project is
+
+A research-grade demonstration of **subgraph-RAG over PharmGKB** — the open clinical
+pharmacogenomics database — built from scratch and evaluated honestly.
+
+It has two parallel surfaces over the same underlying knowledge graph:
+
+### 1. The interactive web app (the demo)
+A Cytoscape-rendered graph (3,213 nodes, 8,024 edges built from PharmGKB
+clinical-variant rows) with two grounded reasoning panels:
 
 - **Explain** — click any node or edge on the canvas; an LLM explains it
   using its 2-hop neighbourhood as context.
-- **Chat** — type a freeform question; a real GraphRAG retrieval step
-  (entity-linking → 1-hop neighbourhoods → shortest paths) is run *before*
-  the LLM is called.
+- **Chat** — type a free-form question; a real GraphRAG retrieval step
+  (entity-linking → 1-hop neighbourhoods → BFS shortest paths) runs
+  *before* the LLM is called.
 
 Every answer ships with a collapsible **"Context sent to model"** panel
-showing the exact system prompt, user prompt, graph context, size, and a
-copy button — so the GraphRAG step is fully observable, not magic.
+showing the exact system prompt, user prompt, graph context, and token
+estimate. The retrieval step is fully observable, not magic.
+
+### 2. The evaluation framework
+An end-to-end Python pipeline that tests whether the graph layer
+genuinely outperforms (a) a strong plain-text retriever and (b) a no-context
+baseline. 187 held-out questions across 8 strata, four independent metric
+families (rule-based, blinded pairwise preference, anchored 1–5 rubric
+ratings, merged-claim hallucination rate). All scripts and raw evidence
+committed for reproducibility.
+
+The full result and methodology live in the
+[**eval report**](https://polygence-pubmed-graphrag.web.app/eval-report).
+**Headline finding:** the graph layer did not statistically beat
+plain-text RAG on this benchmark (49% pairwise preference, p=0.83). The
+LLM judge preferred the no-context model's confident-but-fabricating
+answers (it invented PMIDs ~68% of the time and the judge couldn't tell).
+The graph's one consistent advantage was appropriate refusal on
+out-of-distribution queries.
+
+---
+
+## Repo layout
 
 ```
 polygence-anesthesia-graphRAG/
-├── *.tsv                       # raw PharmGKB data (kept as-is)
-├── preprocess/build_graph.py   # data-loading + simplification
-├── data/                       # generated JSON (gitignored — rerun script)
-├── web/                        # Next.js + TypeScript + Cytoscape app
-├── functions/                  # Firebase Cloud Function (Gemini proxy)
-├── scripts/                    # one-script-per-task wrappers (see below)
-├── firebase.json, .firebaserc  # Firebase Hosting + Functions config
-└── README.md
+├── README.md                   This file
+├── CLAUDE.md                   Quick reference for AI coding assistants
+├── architecture.html           Standalone architecture page (visualises the codebase)
+├── eval-explainer.html         Visual one-pager of the eval methodology
+├── firebase.json, .firebaserc  Firebase Hosting + Functions config
+│
+├── *.tsv                       Raw PharmGKB data (kept as-is, ~160k rows total)
+├── preprocess/build_graph.py   TSV → graph.json + seed_anesthesia.json + search_index.json
+├── data/                       Generated JSON artifacts (gitignored — rerun the script)
+│
+├── functions/                  Firebase Cloud Function: /api/llm → Gemini proxy
+│
+├── web/                        Next.js 14 + TS + Cytoscape app
+│   ├── app/                    Pages + API routes
+│   ├── components/             GraphCanvas, sidebars, modal, UI primitives
+│   ├── lib/                    Graph retrieval, LLM provider abstraction, store
+│   └── scripts/                Build / deploy scripts (called by repo-root wrappers)
+│
+├── scripts/                    One-script-per-task wrappers (run from anywhere)
+│
+└── eval/                       Reproducible evaluation framework
+    ├── preregistration.md      Frozen hypotheses + decision rules
+    ├── *.py                    Pipeline: rebuild, generate, run, grade, judge, segment, report
+    ├── questions.jsonl         187 held-out questions + gold records
+    ├── answers.jsonl           748 LLM responses (raw evidence, committed)
+    ├── judgments.jsonl         374 pairwise judgments
+    ├── scores.jsonl            Rule-based metrics
+    ├── rubric.jsonl            F/C/CS ratings
+    ├── segments.jsonl          Merged-claim records
+    └── report.html, results.json
 ```
 
 ---
@@ -214,8 +279,73 @@ Try:
 
 ## Tech stack
 
-- **Frontend:** Next.js 14 (App Router) · TypeScript · Tailwind · Cytoscape.js (fcose layout) · Zustand · Fuse.js · lucide-react
-- **Backend (local):** Next.js API routes · Node `child_process` (Claude CLI spawn) · OpenAI SDK
-- **Backend (deployed):** Firebase Hosting (static) + Firebase Cloud Functions v2 (Node 20, Gemini proxy)
+- **Frontend:** Next.js 14 (App Router) · TypeScript · Tailwind · Cytoscape.js (fcose layout) · Zustand · Fuse.js · Radix UI Dialog/Slot · CVA · lucide-react
+- **Backend (local):** Next.js API routes · Node `child_process` spawning `claude -p` (the Claude Code CLI)
+- **Backend (deployed):** Firebase Hosting (static export) + Firebase Cloud Functions v2 (Node 20, Gemini proxy with secret-managed key)
 - **Preprocessing:** Python 3 stdlib only (no pip deps)
-- **Data:** PharmGKB TSV exports (included in repo)
+- **Eval pipeline:** Python 3.12 · `rank_bm25` · `sentence-transformers` (all-MiniLM-L6-v2, runs locally) · `rapidfuzz` · `numpy` · Claude CLI for generation and judging
+- **Data:** PharmGKB TSV exports (included in repo, ~160k rows across 6 files)
+- **Eval models:** Claude Sonnet 4 (generator) · Claude Haiku 4.5 (judge, within-Claude size split)
+- **Production LLM:** Gemini 2.5 Flash (Cloud Function default) · user-supplied OpenAI / Anthropic / Gemini / DeepSeek key (in-app BYOK modal)
+
+---
+
+## Reproducing the evaluation
+
+Everything needed to reproduce the eval from scratch is committed under `eval/`.
+Total wall time: ~5 hours. Total LLM-cost (Claude): ~$45.
+
+```bash
+# 1. Build the held-out graph + 187 questions (deterministic, seeds 42 + 7)
+python3 eval/rebuild_heldout.py
+python3 eval/generate_questions.py
+
+# 2. Build A1's plain-text-RAG index (one-time, ~20s, no LLM cost)
+python3 eval/a1_index.py
+
+# 3. Generate the 4 × 187 = 748 answers via the Claude CLI
+#    (~3-4 hours, ~$25, resumable — re-run skips completed)
+python3 eval/run.py --model sonnet
+
+# 4. Rule-based metrics (deterministic, no LLM)
+python3 eval/grade.py
+
+# 5. Blinded pairwise preference (Haiku judge, 6 parallel workers)
+python3 eval/judge.py --workers 6
+
+# 6. Anchored rubric ratings (F/C/CS 1-5)
+python3 eval/judge_rubric.py --workers 8
+
+# 7. Merged-claim hallucination
+python3 eval/segment.py --workers 4
+
+# 8. Generate the final HTML report + machine-readable summary
+python3 eval/report.py
+open eval/report.html
+```
+
+All seeds are fixed; outputs are identical on re-run. The full preregistration
+(hypotheses, decision thresholds, A1 spec) lives in `eval/preregistration.md`
+and was committed before any LLM calls were made.
+
+---
+
+## Acknowledgements
+
+This project was built by **Mihika Pall** as part of the
+[Polygence](https://www.polygence.org/) research mentorship program (2026).
+
+- **Data:** [PharmGKB](https://www.pharmgkb.org/), the open clinical pharmacogenomics
+  knowledge base. All curated drug-gene-variant-phenotype relationships and
+  evidence levels are sourced from PharmGKB's released TSV exports.
+- **Anesthesia/MH expertise:** the demo's anesthesia seed subgraph and drug-class
+  injections were informed by CPIC and MHAUS guidelines.
+- **Engineering assistance:** development and evaluation work were paired with
+  [Claude Code](https://claude.com/claude-code) (Claude Opus 4.7).
+
+---
+
+## License
+
+The source code in this repository is released under the MIT License.
+PharmGKB data is governed by [PharmGKB's data use policy](https://www.pharmgkb.org/page/dataUsagePolicy).

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import {
-  Network, ShieldCheck, Eye, ArrowRight, Github, Linkedin,
+  Network, ShieldCheck, Eye, ArrowRight, Github, Linkedin, Layers,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 
@@ -73,8 +73,8 @@ export default function AboutPage() {
         />
       </section>
 
-      {/* Eval report — prominent link */}
-      <section className="mx-auto max-w-3xl px-6 pb-16">
+      {/* Two prominent links — eval report and architecture */}
+      <section className="mx-auto max-w-3xl px-6 pb-16 space-y-4">
         <a
           href="/eval-report"
           className="block rounded-3xl border border-border bg-card p-7 shadow-soft hover:shadow-gentle transition-shadow"
@@ -97,6 +97,33 @@ export default function AboutPage() {
               </p>
               <div className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-primary">
                 Read the report →
+              </div>
+            </div>
+          </div>
+        </a>
+
+        <a
+          href="/architecture"
+          className="block rounded-3xl border border-border bg-card p-7 shadow-soft hover:shadow-gentle transition-shadow"
+        >
+          <div className="flex items-start gap-4">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+              <Layers size={18} />
+            </span>
+            <div className="flex-1">
+              <div className="text-xs font-semibold uppercase tracking-wider text-primary mb-1">
+                Code architecture
+              </div>
+              <h3 className="text-base font-semibold text-foreground">
+                How the system is built — modules, data flow, file tree
+              </h3>
+              <p className="mt-1.5 text-sm text-muted-foreground leading-relaxed">
+                A walkthrough of the codebase: how raw PharmGKB TSVs become a 3,213-node graph,
+                how the live web app and eval framework consume it, and what happens for one
+                example question end-to-end.
+              </p>
+              <div className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-primary">
+                View the architecture →
               </div>
             </div>
           </div>

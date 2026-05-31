@@ -1491,7 +1491,7 @@ def main() -> int:
     body.append('<div class="paper-header">')
     body.append('<div class="venue">Polygence research report · pharmacogenomic knowledge-graph RAG</div>')
     body.append('<h1>Does subgraph retrieval over a knowledge graph outperform plain-text retrieval for pharmacogenomic question answering?</h1>')
-    body.append('<p class="byline">An evaluation of three RAG architectures on 187 held-out PharmGKB questions, with rule-based and LLM-judge scoring.</p>')
+    body.append('<p class="byline"><strong>Mihika Pall</strong> · Polygence (2026). An evaluation of three RAG architectures on 187 held-out PharmGKB questions, with rule-based and LLM-judge scoring.</p>')
     body.append('</div>')
 
     # Abstract
@@ -1655,10 +1655,11 @@ def main() -> int:
     </ol>""")
 
     body.append('<footer>'
+                'Author: <strong>Mihika Pall</strong> · Polygence research mentorship program (2026). '
                 f'Generated from {len(scores)} scores and {len(judgments)} judgments. '
                 'Generator: Claude Sonnet 4 · Judge: Claude Haiku 4.5. '
-                'Methodology: <code>~/.claude/plans/elegant-skipping-quiche.md</code>. '
-                'Pre-registration: <code>eval/preregistration.md</code>.'
+                'Pre-registration: <code>eval/preregistration.md</code>. '
+                'Source: <a href="https://github.com/mihikap01/polygence-anesthesia-graphRAG">github.com/mihikap01/polygence-anesthesia-graphRAG</a>.'
                 '</footer>')
     body.append("</div>")
 

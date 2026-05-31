@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Fuse from "fuse.js";
 import Link from "next/link";
-import { Search, RefreshCw, Filter as FilterIcon, Info, FileText } from "lucide-react";
+import { Search, RefreshCw, Filter as FilterIcon, Info, FileText, Layers } from "lucide-react";
 import { useStore } from "@/lib/store";
 import type { SearchHit, NodeType, EdgeType } from "@/lib/graph/types";
 import { fetchSearchIndex, fetchGraphForSeed, fetchSeedGraph } from "@/lib/graph/data-api";
@@ -90,6 +90,13 @@ export default function LeftSidebar() {
             title="Read the evaluation report"
           >
             <FileText size={12}/> Eval report
+          </a>
+          <a
+            href="/architecture"
+            className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+            title="View the code architecture"
+          >
+            <Layers size={12}/> Architecture
           </a>
         </div>
       </div>
