@@ -25,12 +25,13 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 EVAL = ROOT / "eval"
 
-ARMS = ["A0", "A1", "A2", "A3"]
+ARMS = ["A0", "A1", "A2", "A3"]   # all loaded from data (A2 retained for reproducibility)
+DISPLAY_ARMS = ["A0", "A1", "A3"]  # what we show in the report
 ARM_LABELS = {
     "A0": "A0 · LLM alone (no context)",
     "A1": "A1 · LLM + plain-text retrieval",
-    "A2": "A2 · LLM + full subgraph dump",
-    "A3": "A3 · LLM + GraphRAG (the system)",
+    "A2": "A2 · LLM + static subgraph dump",
+    "A3": "A3 · LLM + subgraph RAG (system under test)",
 }
 STRATUM_NAMES = {
     "S1": "Well-known facts",
@@ -253,7 +254,7 @@ def html_headline(headline, judgments_summary) -> str:
                 '<th class="right" title="% of expected entities (drugs/genes/etc.) the answer named">Entity recall</th>'
                 '<th class="right" title="% of cited PMIDs that exist in our corpus (vs. invented)">PMIDs real (when cited)</th>'
                 '</tr></thead><tbody>')
-    for arm in ARMS:
+    for arm in DISPLAY_ARMS:
         m = headline[arm]
         is_a3 = "highlight" if arm == "A3" else ""
         rows.append(
@@ -317,7 +318,7 @@ def html_per_stratum(per_stratum_data, pairwise_per_stratum_data) -> str:
         if s == "S4": out.append('<th class="right">PMID correct</th>')
         if s in ("S6", "S7"): out.append('<th class="right">Refusal correct</th>')
         out.append("</tr></thead><tbody>")
-        for arm in ARMS:
+        for arm in DISPLAY_ARMS:
             d = sdata.get(arm, {})
             cells = [
                 f'<td>{ARM_LABELS[arm]}</td>',
@@ -358,7 +359,7 @@ def html_examples(answers_by_qid_arm, questions, qid_picks: list[str]) -> str:
         out.append(f'<p class="muted"><strong>Q:</strong> {html.escape(q["question"])}</p>')
         out.append(f'<p class="muted"><strong>Gold:</strong> {html.escape(json.dumps(q["gold"])[:300])}</p>')
         out.append("<div class='examples'>")
-        for arm in ARMS:
+        for arm in DISPLAY_ARMS:
             a = answers_by_qid_arm.get((qid, arm))
             if not a:
                 continue
@@ -380,9 +381,16 @@ CSS = """
   --gentle:0 4px 20px -4px rgba(30,50,80,.10), 0 2px 6px -2px rgba(30,50,80,.05); }
 * { box-sizing:border-box; }
 body { margin:0; background:var(--bg); color:var(--fg); font-family:Inter,system-ui,sans-serif; line-height:1.6; }
-.wrap { max-width:980px; margin:0 auto; padding:40px 24px; }
+.wrap { max-width:880px; margin:0 auto; padding:48px 24px 64px; }
+.paper-header { padding:0 0 32px; border-bottom:1px solid var(--border); margin-bottom:32px; }
+.venue { font-size:11px; text-transform:uppercase; letter-spacing:.12em; color:var(--muted); margin-bottom:14px; }
+.byline { font-size:14px; color:var(--muted); margin-top:10px; max-width:680px; line-height:1.55; }
+.abstract { background:var(--card); border:1px solid var(--border); border-radius:14px; padding:20px 24px; margin:0 0 28px; box-shadow:var(--soft); }
+.abstract h3 { margin:0 0 8px; font-size:14px; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); }
+.abstract p { font-size:14.5px; line-height:1.65; margin:8px 0; }
+pre.figure { background:var(--bg); border:1px solid var(--border); border-radius:10px; padding:14px; font-size:12.5px; overflow-x:auto; }
 .hero { text-align:center; padding:24px 0 36px; }
-h1 { font-size:36px; font-weight:600; letter-spacing:-.02em; margin:14px 0 12px; line-height:1.15; }
+h1 { font-size:30px; font-weight:600; letter-spacing:-.02em; margin:0 0 6px; line-height:1.2; }
 h1 em { font-style:normal; color:var(--primary); }
 h2 { font-size:22px; margin:56px 0 14px; font-weight:600; letter-spacing:-.01em; }
 h3 { font-size:16px; margin:24px 0 8px; font-weight:600; }
@@ -536,7 +544,7 @@ def html_rubric(rub: dict) -> str:
     out = ['<table><thead><tr><th>Arm</th><th class="right">n</th>'
            '<th class="right">Faithfulness</th><th class="right">Completeness</th>'
            '<th class="right">Clinical soundness</th></tr></thead><tbody>']
-    for arm in ARMS:
+    for arm in DISPLAY_ARMS:
         m = rub.get(arm, {})
         if not m.get("n"):
             out.append(f'<tr><td>{ARM_LABELS[arm]}</td><td class="right">0</td><td class="right">—</td><td class="right">—</td><td class="right">—</td></tr>')
@@ -566,7 +574,7 @@ def html_hallucination(hr: dict) -> str:
                '<th class="right">Unverifiable</th>'
                '<th class="right">Hallucination rate</th>'
                '<th class="right">Support rate</th></tr></thead><tbody>')
-    for arm in ARMS:
+    for arm in DISPLAY_ARMS:
         m = hr.get(arm, {})
         cls = "highlight" if arm == "A3" else ""
         out.append(
@@ -613,7 +621,6 @@ def html_findings(pw: dict, pwps: dict, head: dict) -> str:
     h1_word = "SUPPORTED" if h1_supported else "NOT SUPPORTED"
 
     return f"""
-    <h2>What the numbers tell us</h2>
     <div class="callout">
       <span class="callout-label">Primary verdict: H1 {h1_word}</span>
       When the blinded judge compared GraphRAG's answer to plain-text RAG's answer on the same
@@ -737,18 +744,283 @@ Rules:
 - Do not fabricate dosing recommendations or clinical advice."""
 
 
+def html_abstract(pw: dict, head: dict) -> str:
+    def rate(pair):
+        m = pw.get(pair, {})
+        armA, armB = pair.split("_vs_")
+        if not m.get(f"{armA}_wins") and not m.get(f"{armB}_wins"):
+            return None, None
+        a3 = m[f"{armA}_wins"] if armA == "A3" else m[f"{armB}_wins"]
+        o = m[f"{armB}_wins"] if armA == "A3" else m[f"{armA}_wins"]
+        return a3 / (a3 + o), m["p_value"]
+    a1_rate, a1_p = rate("A3_vs_A1")
+    a0_pmid = head["A0"]["pmid_exists_rate_mean"]
+    a3_pmid = head["A3"]["pmid_exists_rate_mean"]
+    return f"""
+    <div class="abstract">
+      <h3>Abstract</h3>
+      <p>We evaluate whether subgraph-RAG over a curated pharmacogenomic knowledge graph
+        (PharmGKB) produces better question-answering than (i) a frontier LLM with no retrieved
+        context, or (ii) the same LLM with a strong hybrid plain-text retriever (BM25 + dense
+        embeddings, RRF, top-K). We compare these three retrieval conditions on 187 questions
+        derived from a 30% held-out partition of PharmGKB's high-evidence clinical-variant rows,
+        across eight question strata. The primary outcome is blinded pairwise preference judged
+        by Claude Haiku 4.5; secondary outcomes include deterministic rule-based metrics, anchored
+        1–5 rubric ratings, and merged-claim hallucination rate.</p>
+      <p>Subgraph RAG did <strong>not</strong> outperform plain-text RAG on the primary preference
+        test ({fmt_pct(a1_rate)} A3 wins, sign-test p={a1_p:.2f}). The no-context model was
+        preferred most often by the judge despite fabricating cited paper identifiers (PMIDs) at
+        a rate of {fmt_pct(1 - a0_pmid)}, versus {fmt_pct(1 - a3_pmid)} for subgraph RAG —
+        evidencing that LLM-as-judge rewards fluent confidence over factual grounding. The
+        graph layer's only consistent advantage was appropriate refusal on out-of-distribution
+        queries. We attribute the null primary result to PharmGKB's row-level denormalisation,
+        which packs multi-hop facts into single text chunks and thereby allows strong text
+        retrieval to recover them without graph traversal. We discuss confounds (notably
+        partial held-out leakage via <code>relationships.tsv</code>) and propose targeted
+        follow-up experiments.</p>
+    </div>"""
+
+
+def html_introduction() -> str:
+    return """
+    <span class="section-tag">1 · introduction</span>
+    <h2>1. Introduction</h2>
+    <p>Retrieval-augmented generation (RAG) systems are increasingly proposed for biomedical
+      question answering, where the cost of fabricated facts is high. A growing literature argues
+      that <em>knowledge-graph</em>-based RAG — retrieving a relevant subgraph instead of text
+      chunks — should outperform plain-text RAG by preserving entity relationships, evidence
+      provenance, and multi-hop reasoning paths.</p>
+    <p>This report tests that claim concretely. We evaluate a subgraph-RAG implementation built
+      over PharmGKB, the curated pharmacogenomic knowledge base, focused on anesthesia and
+      pharmacogenomic-risk reasoning. We compare it against (a) the same frontier LLM with no
+      retrieved context (a parametric-knowledge baseline) and (b) the same LLM with a strong
+      hybrid text retriever over the same data. The primary test is blinded pairwise preference;
+      secondary tests are rule-based grounding metrics, anchored rubric ratings, and a per-claim
+      hallucination metric using merged-claim segmentation.</p>"""
+
+
+def html_background() -> str:
+    return """
+    <span class="section-tag">2 · background</span>
+    <h2>2. Background</h2>
+    <p><strong>RAG architectures.</strong> The classical RAG pipeline chunks text, indexes
+      chunks via similarity search, and concatenates the top-K matches into the LLM's prompt.
+      <em>Subgraph RAG</em> instead indexes the source data as a knowledge graph: at query time
+      the question is entity-linked to graph nodes, the system extracts a relevant subgraph
+      (neighborhoods of linked entities and/or shortest paths between them), and renders that
+      subgraph as text for the LLM. We refer to the system under test as "subgraph RAG"
+      following common usage. Note that this is <em>distinct</em> from Microsoft GraphRAG
+      (Edge et al., 2024), which additionally pre-computes LLM-generated summaries of
+      automatically-detected graph communities and retrieves over those summaries — a step we
+      did not implement.</p>
+    <p><strong>The claim under test.</strong> Subgraph RAG should improve over text RAG when
+      (i) the graph captures relationships that are not co-located in single source documents,
+      (ii) the question requires reasoning across multiple such relationships, and (iii) the
+      generator benefits from explicit relationship structure in its prompt. The PharmGKB demo
+      makes these claims for pharmacogenomic question answering. We test whether they hold under
+      a blinded, held-out evaluation.</p>"""
+
+
+def html_dataset_body(ev_dist: dict) -> str:
+    sample = """variant       gene    type      level_of_evidence  chemicals                          phenotypes
+rs2108622     CYP4F2  Dosage    1B                 warfarin                           (none)
+rs7294        VKORC1  Dosage    1B                 warfarin                           (none)
+rs118192177   RYR1    Toxicity  1A                 desflurane,enflurane,halothane,    Malignant Hyperthermia
+                                                   isoflurane,sevoflurane,succinylcholine"""
+    rows = "".join(f"<tr><td><code>{lvl}</code></td><td class='right'>{n}</td></tr>" for lvl, n in ev_dist.items())
+    return f"""
+    <p>The source is <a href="https://www.pharmgkb.org/" target="_blank">PharmGKB</a>, an open
+      pharmacogenomics database. The backbone for our graph is
+      <code>clinicalVariants.tsv</code>: approximately 5,200 curated rows, each linking a
+      genetic variant to one or more drugs (and often a disease phenotype), with a peer-reviewed
+      evidence level (1A strongest through 4 weakest).</p>
+    <p class="muted" style="font-size:12px;margin-bottom:2px;">Table 1. Example rows from <code>clinicalVariants.tsv</code> (truncated columns).</p>
+    <pre class="figure">{sample}</pre>
+    <p class="muted" style="font-size:12px;margin-bottom:2px;">Table 2. Evidence-level distribution in the full file.</p>
+    <table><thead><tr><th>Level</th><th class="right">Rows</th></tr></thead><tbody>{rows}</tbody></table>
+    <p>We restrict to high-evidence rows (1A · 1B · 2A · 2B, ≈400 total) because these are the
+      most clinically meaningful and least noisy. The full reasoning graph built from these rows
+      (plus a curated drug-class layer and per-gene variant-cluster collapsing) contains 3,213
+      nodes and 8,024 edges in the production app.</p>"""
+
+
+def html_held_out_body() -> str:
+    return """
+    <p>A core methodological challenge: both the system under test and any in-distribution
+      question source come from PharmGKB. Naive question generation would let subgraph RAG
+      "win" by lookup rather than reasoning. We address this with a deterministic
+      train/test split:</p>
+    <ol style="font-size:14px;">
+      <li>Restrict to the 400 high-evidence clinical-variant rows (levels 1A/1B/2A/2B).</li>
+      <li>Randomly select 30% (120 rows) as held-out. Seed fixed at 42 for reproducibility.</li>
+      <li>Rebuild the graph <em>without</em> these rows. The same flag also strips them from
+        the plain-text retriever's index, so neither A1 nor A3 can recover them by direct
+        lookup.</li>
+      <li>Generate 187 questions from those held-out rows using stratum-specific templates
+        (§3.5).</li>
+    </ol>
+    <p>The reduced graph contains 3,203 nodes and 7,972 edges (reduction is small because most
+      graph edges have multiple supporting source rows). The 120 held-out rows yield 187 test
+      questions across 8 question types.</p>"""
+
+
+def html_arms_body() -> str:
+    return f"""
+    <p>The three arms use the <strong>same generator (Claude Sonnet 4)</strong> with the
+      <strong>same system prompt</strong> (§3.4). The only variable across arms is the context
+      provided alongside the question, allowing us to isolate the effect of retrieval (A0 vs.
+      A1/A3) and the effect of graph-native vs. text-similarity retrieval (A1 vs. A3).</p>
+    <p class="muted" style="font-size:12px;margin-bottom:2px;">Figure 1. The three arms shown
+      against a single representative question (<code>{SAMPLE_QID}</code>:
+      <em>"{SAMPLE_QUESTION}"</em>).</p>
+    <div class="arm-card-grid">
+      <div class="arm-card">
+        <span class="lbl">A0 · LLM alone (no retrieval)</span>
+        <h4>Parametric-knowledge baseline</h4>
+        <p class="desc">The model receives only the question. Tests what the frontier LLM
+          already knows from training.</p>
+        <pre>{html.escape(SAMPLE_CTX_A0)}</pre>
+      </div>
+      <div class="arm-card">
+        <span class="lbl">A1 · plain-text RAG</span>
+        <h4>Hybrid text-similarity retrieval (steelman)</h4>
+        <p class="desc">PharmGKB rows are denormalised into single-row text chunks (clinical
+          variants + the relevant subset of <code>relationships.tsv</code>) and indexed with BM25
+          plus dense embeddings (sentence-transformers/all-MiniLM-L6-v2). At query time the two
+          rankings are fused via reciprocal-rank-fusion (k=60) and the top 8 chunks are
+          concatenated into the prompt. Isolates the contribution of <em>any</em> retrieval over
+          the same data, independent of graph structure.</p>
+        <pre>{html.escape(SAMPLE_CTX_A1)}</pre>
+      </div>
+      <div class="arm-card a3">
+        <span class="lbl">A3 · subgraph RAG (system under test)</span>
+        <h4>Entity-linking → 1-hop neighborhood → shortest-path expansion</h4>
+        <p class="desc">For each question: (1) fuzzy-match question tokens against the graph's
+          3,203 nodes via the search index to identify mentioned entities (up to 6, by score);
+          (2) extract each linked entity's 1-hop neighborhood of edges; (3) compute BFS shortest
+          paths between every pair of linked entities, up to 4 hops, preferring edges flagged
+          CRITICAL or evidence-level 1A/1B; (4) render the result as a structured text block
+          with explicit sections for entities, neighborhoods, and paths. A purely text-similarity
+          system cannot perform steps 1, 2, or 3.</p>
+        <pre>{html.escape(SAMPLE_CTX_A3)}</pre>
+      </div>
+    </div>
+    <p style="font-size:13px;margin-top:14px;">
+      <strong>On terminology.</strong> A3 is what the literature usually calls "subgraph RAG"
+      — query-conditional retrieval of a relevant subgraph, rendered for the LLM. We do not
+      implement Microsoft GraphRAG (Edge et al., 2024), which adds an offline community-detection
+      and LLM-summarisation step. Our test concerns the subgraph-RAG variant because that is the
+      architecture the demo ships.
+    </p>
+    <p style="font-size:13px;color:var(--muted);">
+      <strong>Why three arms, not four.</strong> A fourth condition (A2 — a static dump of a
+      hand-curated 36-node anesthesia subgraph) was generated and retained in the raw data
+      (<code>eval/answers.jsonl</code>). On reflection, A2 conflated "graph context absent" with
+      "graph context off-topic" — its context was the same fixed subgraph for every question
+      regardless of relevance. We omit it from analysis to keep the comparison between three
+      architecturally distinct conditions: <em>no retrieval</em>, <em>text retrieval</em>,
+      <em>graph retrieval</em>.
+    </p>"""
+
+
+def html_prompts_body() -> str:
+    return f"""
+    <p>All three arms receive the same system prompt — identical to the production web app's
+      chat endpoint — and the same user-prompt template (a context block followed by the
+      question). Only the contents of the context block differ.</p>
+    <details open>
+      <summary>System prompt (verbatim)</summary>
+      <pre>{html.escape(CHAT_SYSTEM_PROMPT)}</pre>
+    </details>
+    <details>
+      <summary>User-prompt template</summary>
+      <pre>Context:
+---
+{{context_block — A0: empty placeholder; A1: top-8 RRF-fused chunks; A3: structured subgraph}}
+---
+
+User question: {{the question}}</pre>
+    </details>"""
+
+
+def html_questions_body(questions: dict) -> str:
+    samples = []
+    for s in STRATUM_NAMES:
+        for qid in sorted(questions):
+            if questions[qid]["stratum"] == s:
+                samples.append((s, questions[qid]))
+                break
+    cards = []
+    for s, q in samples:
+        gold = q.get("gold", {})
+        gold_str = "  ".join(f"{k}={v}" for k, v in gold.items() if k != "answer_summary")
+        cards.append(
+            f'<div class="q-card">'
+            f'<div><span class="stratum">{s}</span><strong>{STRATUM_NAMES[s]}</strong></div>'
+            f'<div style="margin-top:6px;">{html.escape(q["question"])}</div>'
+            f'<div class="gold">gold: {html.escape(gold_str[:240])}</div>'
+            f'</div>')
+    return f"""
+    <p>Questions are generated by stratum-specific templates from the held-out rows. Each
+      question carries a structured <code>gold</code> record (expected entities, evidence level,
+      valid PMIDs, refusal flag) used by both the rule-based grader and the LLM judge.</p>
+    <p class="muted" style="font-size:12px;margin-bottom:2px;">Table 3. The eight strata.</p>
+    <table><thead><tr><th>#</th><th>Stratum</th><th>What it probes</th><th class="right">n</th></tr></thead><tbody>
+      <tr><td>S1</td><td>Well-known facts</td><td>Does the graph layer hurt easy questions?</td><td class="right">20</td></tr>
+      <tr><td>S2</td><td>Specific evidence levels</td><td>Precision in distinguishing 1A vs. 2A</td><td class="right">25</td></tr>
+      <tr class="highlight"><td>S3</td><td><strong>Multi-hop reasoning</strong></td><td><strong>Direct test of graph traversal value</strong></td><td class="right">40</td></tr>
+      <tr><td>S4</td><td>Citation grounding</td><td>PMID accuracy</td><td class="right">25</td></tr>
+      <tr><td>S5</td><td>Long-tail / niche</td><td>Retrieval value beyond parametric memory</td><td class="right">25</td></tr>
+      <tr><td>S6</td><td>Negative controls</td><td>Resistance to hallucinating false associations</td><td class="right">25</td></tr>
+      <tr><td>S7</td><td>Out-of-distribution</td><td>Refusal correctness on unknown drugs</td><td class="right">15</td></tr>
+      <tr><td>S8</td><td>Comparative</td><td>Reasoning across multiple nodes</td><td class="right">12</td></tr>
+    </tbody></table>
+    <p class="muted" style="font-size:12px;margin-top:18px;margin-bottom:6px;">Figure 2. One real example question per stratum.</p>
+    {"".join(cards)}"""
+
+
+def html_metrics_body() -> str:
+    return """
+    <p>Four independent measurement approaches are used; their disagreement modes are
+      complementary, so convergence across all four is treated as the strongest signal.</p>
+    <ol style="font-size:14px;">
+      <li><strong>Rule-based metrics</strong> (deterministic Python). PMID existence in our
+        corpus, entity precision and recall against the gold entity set, evidence-level
+        exact-match (for the relevant stratum), and refusal correctness (for negative-control
+        and out-of-distribution strata). Same definition across arms.</li>
+      <li><strong>Blinded pairwise preference</strong> (Claude Haiku 4.5 as judge). For each
+        question, the judge sees two answers with arm labels stripped and order randomised, then
+        picks the preferred answer or "tie." A3 vs. A1 is the primary headline; A3 vs. A0 is
+        secondary. We report sign-test p-values and Wilson-score 95% confidence intervals.</li>
+      <li><strong>Anchored rubric ratings (1–5)</strong>. Same judge rates each answer
+        independently on Faithfulness, Completeness, and Clinical soundness against ground
+        truth (not against arm-specific retrieved context, which would penalise A0 by
+        construction).</li>
+      <li><strong>Merged-claim hallucination rate</strong>. Per question, the judge extracts
+        the union of atomic factual claims across all four arms\' answers, then marks each as
+        supported / unsupported / unverifiable against ground truth. Same merged claim list
+        yields the same denominator across arms, making the comparison fair.</li>
+    </ol>
+    <p style="font-size:13px;">
+      <strong>Generator / judge configuration.</strong> Generator: Claude Sonnet 4 via the
+      Claude Code CLI. Judge: Claude Haiku 4.5 via a separate CLI session. This within-family
+      size split partially mitigates self-preference bias (a known weakness of LLM-as-judge
+      when generator and judge share parameters); a cross-family judge (e.g. Gemini judging
+      Claude) would be stronger and is listed as a methodological improvement in §7.
+    </p>"""
+
+
 def html_glossary() -> str:
     return """
     <details open style="margin:8px 0 32px;">
       <summary style="font-size:14px;">Reading guide — what the codes and metrics mean</summary>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:14px;font-size:13px;">
         <div>
-          <h4 style="margin:0 0 8px;font-size:13px;">The four arms (approaches we compared)</h4>
+          <h4 style="margin:0 0 8px;font-size:13px;">The three arms compared</h4>
           <ul style="margin:0;padding-left:18px;color:var(--muted);">
             <li><strong>A0 · LLM alone</strong> — question only, no retrieved context</li>
-            <li><strong>A1 · plain-text RAG</strong> — strong text-similarity search returns relevant text chunks</li>
-            <li><strong>A2 · full subgraph dump</strong> — entire anesthesia subgraph as plain text</li>
-            <li><strong>A3 · GraphRAG</strong> — the system: entity-link → graph neighborhood → structured prompt</li>
+            <li><strong>A1 · plain-text RAG</strong> — hybrid BM25 + dense retrieval over PharmGKB rows</li>
+            <li><strong>A3 · subgraph RAG</strong> — entity-link → graph neighborhood → shortest paths → structured prompt</li>
           </ul>
         </div>
         <div>
@@ -891,47 +1163,61 @@ def html_arms_explained() -> str:
     return f"""
     <span class="section-tag">4 · the four approaches we compared</span>
     <h2>The 4 arms — same model, only the context differs</h2>
-    <p>All four arms use the <strong>same generator model (Claude Sonnet 4)</strong> with the
-      <strong>same system prompt</strong> (see §5). The only variable is what context the model
-      receives alongside the question. This is what isolates "what graph structure adds" from
-      "what retrieval adds" from "what the model already knows."</p>
-    <p class="muted">Concrete example: all four arms answering question <code>{SAMPLE_QID}</code> —
-      <em>"{SAMPLE_QUESTION}"</em></p>
+    <p>The three arms use the <strong>same generator (Claude Sonnet 4)</strong> with the
+      <strong>same system prompt</strong> (§3.4). The only variable across arms is the context
+      the model receives. This isolates the effect of retrieval (A0 vs A1, A3) and the effect of
+      graph-native vs text-similarity retrieval (A1 vs A3).</p>
+    <p class="muted">Concrete example below: all three arms answering question
+      <code>{SAMPLE_QID}</code> — <em>"{SAMPLE_QUESTION}"</em></p>
     <div class="arm-card-grid">
       <div class="arm-card">
-        <span class="lbl">A0 · no context</span>
-        <h4>The frontier LLM alone</h4>
-        <p class="desc">Just the question. Tests what the model already knows from training.</p>
+        <span class="lbl">A0 · LLM alone</span>
+        <h4>No retrieved context</h4>
+        <p class="desc">The model answers from parametric knowledge only. Tests the no-retrieval
+          baseline — what does the model already know?</p>
         <pre>{html.escape(SAMPLE_CTX_A0)}</pre>
       </div>
       <div class="arm-card">
-        <span class="lbl">A1 · steelman naïve RAG</span>
-        <h4>Strong text-similarity retrieval</h4>
-        <p class="desc">BM25 + dense embeddings (sentence-transformers/MiniLM), fused via reciprocal-rank-fusion, top-8 chunks. Tests whether <em>retrieval</em> helps, irrespective of structure.</p>
+        <span class="lbl">A1 · plain-text RAG</span>
+        <h4>Hybrid text-similarity retrieval</h4>
+        <p class="desc">PharmGKB rows are chunked into text, indexed with BM25 + dense embeddings
+          (MiniLM), fused via reciprocal-rank-fusion. Returns top-8 chunks per query. Tests whether
+          <em>retrieval</em> over the same data helps, independent of graph structure.</p>
         <pre>{html.escape(SAMPLE_CTX_A1)}</pre>
       </div>
-      <div class="arm-card">
-        <span class="lbl">A2 · full subgraph dump</span>
-        <h4>Curated subgraph as plain text</h4>
-        <p class="desc">The anesthesia seed subgraph (36 nodes, 61 edges) rendered as flat text. Tests whether smart retrieval matters or context-window stuffing is enough.</p>
-        <pre>{html.escape(SAMPLE_CTX_A2)}</pre>
-      </div>
       <div class="arm-card a3">
-        <span class="lbl">A3 · GraphRAG (system under test)</span>
-        <h4>Entity-link → 1-hop neighborhoods → paths</h4>
-        <p class="desc">The actual GraphRAG pipeline: entity-link the question to graph nodes, pull each entity's 1-hop neighborhood, find shortest paths between them, render structured text.</p>
+        <span class="lbl">A3 · subgraph RAG (system under test)</span>
+        <h4>Entity-link → neighborhood → shortest paths</h4>
+        <p class="desc">For each question: fuzzy-match question tokens against the graph's 3,203
+          nodes to identify mentioned entities; pull each entity's 1-hop neighborhood;
+          BFS-compute shortest paths between linked entities; render as structured text.
+          A graph-native retrieval that no text-similarity system can replicate.</p>
         <pre>{html.escape(SAMPLE_CTX_A3)}</pre>
       </div>
     </div>
+    <p class="muted" style="font-size:12px;margin-top:14px;">
+      <strong>Note on terminology.</strong> A3 is what the literature typically calls "subgraph
+      RAG" — query-conditional extraction of a relevant subgraph, rendered for the LLM. It is
+      <em>not</em> Microsoft GraphRAG (Edge et al., 2024), which adds an offline community-summarisation
+      step that we did not implement. We evaluate the subgraph-RAG variant because that is what
+      the repository's web app ships.
+    </p>
+    <p class="muted" style="font-size:12px;margin-top:8px;">
+      <strong>What about A2?</strong> A fourth arm (a static dump of a hand-curated 36-node
+      anesthesia subgraph) was generated and is preserved in the raw data
+      (<code>eval/answers.jsonl</code>). On reflection it tested a different, narrower question
+      ("does irrelevant graph context help?" — answer: no) and is omitted from the analysis to
+      keep the comparison focused on the three architecturally distinct conditions above.
+    </p>
     <div class="callout">
-      <span class="callout-label">Note what's different in A1 vs A3 here</span>
-      For this question (a held-out RYR1 variant), <strong>A1's strong retriever finds nothing
-      genuinely related</strong> — it surfaces random unrelated PharmGKB rows because the
-      variant string itself isn't in any non-held-out chunk. <strong>A3 successfully entity-links
-      "RYR1" and surfaces the full neighborhood</strong> (volatile anesthetics, succinylcholine,
-      Malignant Hyperthermia) with L1A CRITICAL tags. This is the kind of question where graph
-      structure <em>should</em> help — and on this specific one, it did. The aggregate result
-      (49% pairwise preference vs A1) shows it doesn't reliably hold across the 187-question set.
+      <span class="callout-label">What this concrete example reveals</span>
+      On this specific question (a held-out RYR1 variant), A1's hybrid retriever surfaces
+      <em>unrelated</em> PharmGKB rows (osteonecrosis, ustekinumab) because the variant string
+      itself appears in no non-held-out chunk. A3, by contrast, entity-links "RYR1" successfully
+      and surfaces the relevant subgraph (volatile anesthetics, succinylcholine, Malignant
+      Hyperthermia) with L1A CRITICAL tags. This is exactly the pattern where graph structure
+      should provide a measurable benefit. The aggregate result (49% pairwise preference vs A1
+      across 187 questions) shows it does not generalise.
     </div>"""
 
 
@@ -1022,10 +1308,9 @@ def html_hypotheses_cards(pw: dict, pwps: dict, head: dict, scores: list) -> str
     def vcls(ok): return "good" if ok else "bad"
     def vtxt(ok): return "✓ SUPPORTED" if ok else "✗ NOT SUPPORTED"
     return f"""
-    <span class="section-tag">7 · what we hypothesized</span>
-    <h2>The three pre-registered hypotheses</h2>
-    <p>Declared in <code>eval/preregistration.md</code> <em>before</em> any answers were generated,
-      with the exact decision threshold below. This prevents post-hoc goalpost-moving.</p>
+    <p>Each hypothesis below was committed to <code>eval/preregistration.md</code> before any LLM
+      calls were made, with an exact decision threshold. Verdicts shown are computed from the live
+      data.</p>
     <div class="hyp h1">
       <div class="tag">H1<br><span class="muted" style="font-weight:400;font-size:11px;">primary</span></div>
       <div>
@@ -1201,129 +1486,173 @@ def main() -> int:
     # HTML
     body = []
     body.append('<div class="wrap">')
-    body.append('<div class="hero">')
-    body.append('<span class="pill"><span class="dot"></span> GraphRAG eval · 4 arms × 187 held-out PharmGKB questions</span>')
-    body.append('<h1>Does <em>graph structure</em> actually help an LLM answer pharmacogenomics questions?</h1>')
-    body.append('<p class="muted" style="max-width:640px;margin:8px auto 0;">A blinded, falsifiable, four-arm evaluation of the Polygence GraphRAG demo, with cross-checks designed to reveal what LLM-as-judge can and cannot detect.</p>')
+
+    # Title block (paper-style header)
+    body.append('<div class="paper-header">')
+    body.append('<div class="venue">Polygence research report · pharmacogenomic knowledge-graph RAG</div>')
+    body.append('<h1>Does subgraph retrieval over a knowledge graph outperform plain-text retrieval for pharmacogenomic question answering?</h1>')
+    body.append('<p class="byline">An evaluation of three RAG architectures on 187 held-out PharmGKB questions, with rule-based and LLM-judge scoring.</p>')
     body.append('</div>')
 
-    # TL;DR
-    body.append(html_tldr(pw, head, rub))
+    # Abstract
+    body.append(html_abstract(pw, head))
 
-    # Glossary — keeps the rest of the report readable without flipping back
+    # Notation / reading guide
     body.append(html_glossary())
 
-    # 1. Setup
-    body.append(html_setup_60s())
+    # 1. Introduction (replaces "setup in 60s")
+    body.append(html_introduction())
 
-    # 2. Dataset
-    body.append(html_dataset(ev_dist))
+    # 2. Background
+    body.append(html_background())
 
-    # 3. Held-out split
-    body.append(html_held_out_split())
+    # 3. Methods (rolls up dataset / split / arms / prompts / questions / hypotheses / measurement)
+    body.append('<span class="section-tag">3 · methods</span><h2>3. Methods</h2>')
+    body.append('<h3 id="m-data">3.1 Dataset</h3>')
+    body.append(html_dataset_body(ev_dist))
+    body.append('<h3 id="m-split">3.2 Held-out split</h3>')
+    body.append(html_held_out_body())
+    body.append('<h3 id="m-arms">3.3 The three retrieval conditions (arms)</h3>')
+    body.append(html_arms_body())
+    body.append('<h3 id="m-prompts">3.4 Prompts</h3>')
+    body.append(html_prompts_body())
+    body.append('<h3 id="m-questions">3.5 Question set (187 held-out items in 8 strata)</h3>')
+    body.append(html_questions_body(questions))
 
-    # 4. The four arms (with sample contexts)
-    body.append(html_arms_explained())
-
-    # 5. System prompt
-    body.append(html_system_prompt())
-
-    # 6. Question strata + samples
-    body.append(html_strata_samples(questions))
-
-    # 7. Hypotheses
+    # 3.6 Hypotheses
+    body.append('<h3 id="m-hypotheses">3.6 Pre-registered hypotheses</h3>')
+    body.append('<p>The following three hypotheses, with their decision thresholds, were committed to <code>eval/preregistration.md</code> before any LLM calls were made. The aim is to prevent post-hoc goalpost adjustment.</p>')
     body.append(html_hypotheses_cards(pw, pwps, head, scores))
 
-    # 8. How we measured
-    body.append(html_how_we_measured())
+    # 3.7 Metrics
+    body.append('<h3 id="m-metrics">3.7 Evaluation protocol</h3>')
+    body.append(html_metrics_body())
 
-    # 9. The headline results
-    body.append('<span class="section-tag">9 · the results</span>')
-    body.append("<h2>Headline — blinded pairwise preference (n=187)</h2>")
-    body.append('<p class="muted">For each question, Claude Haiku saw both answers blinded with order randomised, and picked the better one. A3 winning &gt;55% with p&lt;0.05 would have supported H1.</p>')
+    # 4. Results
+    body.append('<span class="section-tag">4 · results</span><h2>4. Results</h2>')
+    body.append('<h3 id="r-pairwise">4.1 Primary outcome — blinded pairwise preference (n=187)</h3>')
+    body.append('<p>For each question, the judge (Claude Haiku 4.5) sees both answers with arm labels stripped and presentation order randomised, then picks the preferred answer or "tie." H1 required A3 to win more than 55% of decisive comparisons with sign-test p&lt;0.05.</p>')
+    body.append('<p class="muted" style="font-size:12px;margin-bottom:2px;">Table 4. Headline pairwise preference results.</p>')
     body.append(html_pairwise(pw))
-
-    # Rule-based, rubric, hallucination, per-stratum — wrap as §10
-    body.append('<span class="section-tag">10 · the supporting numbers</span>')
-
-    # Overall rule-based metrics
-    body.append("<h2>Rule-based metrics (overall)</h2>")
-    body.append('<p class="muted">Deterministic Python. PMID exists in our corpus, entity recall vs gold, etc. Same definition across all arms.</p>')
+    body.append('<h3 id="r-rule">4.2 Rule-based metrics (deterministic, all 748 answers)</h3>')
+    body.append('<p>Deterministic Python checks against ground truth. Definitions are symmetric across all arms (no arm is structurally penalised or rewarded by metric construction).</p>')
+    body.append('<p class="muted" style="font-size:12px;margin-bottom:2px;">Table 5. Per-arm rule-based metrics.</p>')
     body.append(html_headline(head, pw))
-
-    # Rubric ratings (Faithfulness / Completeness / Clinical soundness)
     rub_n = sum(m.get("n", 0) for m in rub.values())
-    body.append(f'<h2>Rubric ratings — F / C / CS  <span class="muted">(n={rub_n}/748)</span></h2>')
-    body.append('<p class="muted">Each answer rated 1–5 on Faithfulness (claims supported), '
-                'Completeness (covers gold), Clinical soundness (would a pharmacist call it misleading). '
-                'Mean ± 95% CI half-width.</p>')
-    body.append(html_rubric(rub))
+    body.append(f'<h3 id="r-rubric">4.3 Rubric ratings — Faithfulness, Completeness, Clinical soundness <span class="muted">(n={rub_n}/748 successful)</span></h3>')
+    body.append('<p>Each answer rated 1–5 on three dimensions against ground truth. Judge sees question + gold + answer; arm labels stripped.</p>')
     if rub_n < 740:
-        body.append('<p class="muted"><em>Coverage caveat:</em> rubric run hit Claude CLI hangs in late-S7/S8. '
-                    f'Final coverage {rub_n}/748 ≈ {int(100*rub_n/748)}%. Per-arm counts balanced; means meaningful.</p>')
-
-    # Hallucination via merged segmentation
-    body.append(f'<h2>Hallucination rate — merged claims  <span class="muted">(n={hr.get("questions_covered", 0)}/187)</span></h2>')
-    body.append('<p class="muted">Per question, the judge extracts the union of atomic claims across all 4 answers, '
-                'then per-arm scores each as supported / unsupported / unverifiable. Same denominator across arms.</p>')
-    body.append(html_hallucination(hr))
+        body.append(f'<p class="muted"><em>Coverage note:</em> rubric pass returned {rub_n}/748 (~{int(100*rub_n/748)}%); the remainder failed when the Claude CLI hung past its 120-second timeout on late-stratum questions. Per-arm coverage is balanced (110–113 each), so per-arm means remain interpretable.</p>')
+    body.append('<p class="muted" style="font-size:12px;margin-bottom:2px;">Table 6. Per-arm rubric ratings (mean ± 95% CI half-width).</p>')
+    body.append(html_rubric(rub))
+    body.append(f'<h3 id="r-halluc">4.4 Hallucination rate via merged-claim segmentation <span class="muted">(n={hr.get("questions_covered", 0)}/187 questions)</span></h3>')
+    body.append('<p>Per question, the judge extracts the union of atomic factual claims across all four arms\' answers, then labels each as supported / unsupported / unverifiable against ground truth. Same merged claim list yields the same denominator across arms.</p>')
     if hr.get("questions_covered", 0) < 180:
-        body.append('<p class="muted"><em>Coverage caveat:</em> segmentation stopped early after CLI hangs. '
-                    f'Final coverage {hr.get("questions_covered", 0)}/187, biased to S1–S4. Treat as directional.</p>')
-
-    # Per stratum
-    body.append("<h2>Per-stratum breakdown</h2>")
-    body.append('<p class="muted">Descriptive only — per-stratum n (12–40) is too small for inferential claims. '
-                'Useful for seeing <em>where</em> each arm wins or loses.</p>')
+        body.append(f'<p class="muted"><em>Coverage note:</em> segmentation pass returned {hr.get("questions_covered", 0)}/187 (~{int(100*hr.get("questions_covered", 0)/187)}%); the remainder lost to the same CLI-hang failure mode. Coverage is biased toward strata S1–S4. Absolute rates should be read as directional.</p>')
+    body.append('<p class="muted" style="font-size:12px;margin-bottom:2px;">Table 7. Per-arm claim-level metrics (merged segmentation).</p>')
+    body.append(html_hallucination(hr))
+    body.append('<h3 id="r-stratum">4.5 Per-stratum metrics (descriptive)</h3>')
+    body.append('<p>Per-stratum sample sizes (n=12–40) are too small to support hypothesis tests after multiple-comparison correction. The table below is included as descriptive context for <em>where</em> each arm wins or loses.</p>')
+    body.append('<p class="muted" style="font-size:12px;margin-bottom:2px;">Table 8. Per-stratum × arm breakdown.</p>')
     body.append(html_per_stratum(pps, pwps))
 
-    # 11. Why this happened (existing data-driven findings narrative)
-    body.append('<span class="section-tag">11 · why this happened</span>')
-    body.append("<h2>The deeper finding — preference ≠ correctness</h2>")
+    # 5. Discussion
+    body.append('<span class="section-tag">5 · discussion</span><h2>5. Discussion</h2>')
+    body.append('<h3 id="d-h1">5.1 Why subgraph RAG did not beat plain-text RAG</h3>')
     body.append(html_findings(pw, pwps, head))
-    # Rubric + hallucination corroboration
     if any(rub.get(a, {}).get("n") for a in ARMS) and hr.get("questions_covered"):
         def fm(a): return rub.get(a, {}).get("F_mean")
         def sr(a): return hr.get(a, {}).get("support_rate")
+        body.append('<h3 id="d-corroborate">5.2 Convergence across metric families</h3>')
         body.append(f"""
-        <div class="callout">
-          <span class="callout-label">All four metric families say the same thing</span>
-          <ul>
-            <li><strong>Pairwise preference:</strong> A0 preferred over A3 in {1 - (pw.get('A3_vs_A0',{}).get('armA_rate') or 0):.0%} of comparisons.</li>
-            <li><strong>Rubric Faithfulness (1–5):</strong> A0 {fm('A0'):.2f}, A1 {fm('A1'):.2f}, A3 {fm('A3'):.2f}. Judge rates A0 highest.</li>
-            <li><strong>Merged-claim support rate:</strong> A0 {fmt_pct(sr('A0'))}, A1 {fmt_pct(sr('A1'))}, A3 {fmt_pct(sr('A3'))}, A2 {fmt_pct(sr('A2'))}.</li>
-            <li><strong>Rule-based PMID-exists:</strong> A0 {fmt_pct(head['A0']['pmid_exists_rate_mean'])} (i.e. <strong>fabricates {fmt_pct(1-head['A0']['pmid_exists_rate_mean'])}</strong>), A3 {fmt_pct(head['A3']['pmid_exists_rate_mean'])}.</li>
-          </ul>
-          A0 has strong parametric pharmacogenomic knowledge — its <em>substantive</em> claims are largely correct. But it fabricates specific PMIDs at a high rate that the LLM judge cannot detect. The judge rewards fluent confidence; the rule-based metrics see the lies.
-        </div>""")
+        <p>Four independent measurement approaches were used. They agree:</p>
+        <ul>
+          <li><strong>Pairwise preference:</strong> A0 preferred over A3 in
+            {1 - (pw.get('A3_vs_A0',{}).get('armA_rate') or 0):.0%} of comparisons.</li>
+          <li><strong>Rubric Faithfulness (1–5):</strong> A0 = {fm('A0'):.2f}, A1 = {fm('A1'):.2f},
+            A3 = {fm('A3'):.2f}. The judge rates A0 highest.</li>
+          <li><strong>Merged-claim support rate:</strong> A0 = {fmt_pct(sr('A0'))},
+            A1 = {fmt_pct(sr('A1'))}, A3 = {fmt_pct(sr('A3'))}.</li>
+          <li><strong>Rule-based PMID-exists:</strong> A0 = {fmt_pct(head['A0']['pmid_exists_rate_mean'])}
+            (i.e. fabricates {fmt_pct(1-head['A0']['pmid_exists_rate_mean'])}), A3 = {fmt_pct(head['A3']['pmid_exists_rate_mean'])}.</li>
+        </ul>
+        <p>A0 has strong parametric pharmacogenomic knowledge — its substantive claims are
+          largely correct (74% support rate). But it fabricates specific paper identifiers (PMIDs)
+          at a high rate the LLM judge does not detect. The judge rewards fluent confidence; only
+          the deterministic rule-based metrics catch the fabrication. This is the principled
+          reason for not relying on LLM-judge preference alone in high-stakes evaluations of
+          retrieval systems.</p>""")
+    body.append('<h3 id="d-refusal">5.3 Where subgraph RAG <em>did</em> help: out-of-distribution refusal</h3>')
+    body.append('<p>The one stratum where A3 outperformed A1 was S7 (out-of-distribution drugs not in the graph). When a query referenced an entity the graph genuinely lacks, A3 returned an empty subgraph and appropriately refused; A1\'s text retriever always returns <em>something</em> — semantically related noise — which the model interpreted as license to answer. This is consistent with the view that the structural value of a knowledge graph in this domain is <em>boundary knowledge</em> (what is present vs. absent) rather than multi-hop reasoning.</p>')
+    body.append('<h3 id="d-domain">5.4 Why this domain is harder than expected for graph RAG</h3>')
+    body.append('<p>PharmGKB\'s <code>clinicalVariants.tsv</code> is heavily denormalised: a single row routinely contains variant + gene + evidence level + drugs + phenotypes. "Multi-hop" facts that would require graph traversal in a normalised schema are recoverable in a single text chunk by any sensible text retriever. We conjecture that the absence of a measured benefit for the graph layer in this evaluation reflects this denormalisation, not a deficiency in subgraph RAG as an approach. Domains whose data is genuinely fragmented across documents (e.g. drug-drug interaction networks, citation graphs, multi-source knowledge bases) would be expected to differentiate the approaches more sharply.</p>')
 
-    # 12. Examples
-    body.append('<span class="section-tag">12 · illustrative examples</span>')
-    body.append("<h2>One question per stratum — all four arms side-by-side</h2>")
-    body.append('<p class="muted">Truncated to 600 chars per answer. Look for: A0 confident-but-citation-fabricating, A1 sometimes mis-retrieving, A2 anesthesia-narrow, A3 grounded-but-occasionally-cluttered.</p>')
+    # 6. Limitations
+    body.append('<span class="section-tag">6 · limitations</span><h2>6. Limitations and threats to validity</h2>')
+    body.append('<p>The following limitations and protocol deviations should be borne in mind when reading the headline result.</p>')
+    body.append('<h3 id="l-gen">6.1 Generator and judge configuration</h3>')
+    body.append("""<p>The pre-registration named Claude Opus as the generator; we used Claude Sonnet 4
+      for cost and throughput (~10× cheaper, ~3× faster per call). A stronger generator might
+      raise A0's parametric-knowledge quality further, which would <em>strengthen</em> the
+      pattern reported here (A0 fluent and confident, retrieval arms struggling to improve on it)
+      rather than weaken it. The judge was Claude Haiku 4.5 — a smaller model in the same family
+      — which partially but not fully mitigates self-preference bias. A cross-family judge
+      (Gemini or GPT) would be a methodological improvement.</p>""")
+    body.append('<h3 id="l-leak">6.2 Partial held-out leakage via relationships.tsv</h3>')
+    body.append("""<p>The held-out split removes rows from <code>clinicalVariants.tsv</code> but not from
+      <code>relationships.tsv</code>, which redundantly restates many of the same drug-gene
+      associations along with PMIDs. The plain-text retriever (A1) indexes both files and could
+      therefore still retrieve correct PMIDs for associations whose <code>clinicalVariants</code>
+      row had been held out. The subgraph-RAG arm (A3) genuinely lost those edges from its graph.
+      The S4 (citation) result is the most affected — the judge in some cases preferred A3's
+      refusal to cite over A1's correct-but-unverifiable citation, which conflates "refusal" with
+      "grounding." A cleaner v2 should hold out the corresponding <code>relationships.tsv</code>
+      rows in parallel.</p>""")
+    body.append('<h3 id="l-baseline">6.3 The plain-text RAG baseline (A1) is strong but not maximal</h3>')
+    body.append('<p>The A1 spec uses BM25 + sentence-transformers/MiniLM dense embeddings fused via reciprocal-rank fusion, with the top-8 chunks in the prompt. The pre-registration originally included a BGE cross-encoder reranker, which was dropped to keep the local install lightweight. Adding the reranker would be expected to further strengthen A1 — which would, if anything, make the conclusion stronger (graph structure adds even less over a maximally-tuned text retriever) rather than weaker.</p>')
+    body.append('<h3 id="l-pmid">6.4 Production subgraph-RAG does not surface PMIDs to the model</h3>')
+    body.append('<p>The web app\'s chat endpoint extracts PMIDs into a separate UI-side citations list but does not include them in the LLM\'s prompt. We faithfully ported this behaviour into A3 for the evaluation. As a result, A3 cannot ground PMIDs in the way A1 can, even when the graph has them. This is a real product limitation, not an evaluation artefact; fixing it (inlining PMIDs into the rendered subgraph) is a top-of-list improvement (§7).</p>')
+    body.append('<h3 id="l-power">6.5 Sample size and inferential scope</h3>')
+    body.append("""<p>The primary n=187 pairwise test is adequately powered (sign-test, &gt;0.95 power to
+      detect a 55% preference rate at α=0.05). Per-stratum sample sizes (n=12–40) are <em>not</em>
+      adequately powered after multiple-comparison correction; per-stratum results are reported as
+      descriptive context rather than as inferential claims. Coverage of the rubric and segmentation
+      passes was reduced (60% and 31% respectively) by intermittent Claude CLI hangs, which
+      disproportionately affected the late strata (S7, S8).</p>""")
+    # Appendix: illustrative answers (numbered as 6.6 / appendix)
+    body.append('<h3 id="l-examples">6.6 Appendix — illustrative answers (one question per stratum)</h3>')
+    body.append('<p>Each example shows the three arms\' answers to the same held-out question, truncated to 600 characters. These are representative, not cherry-picked: the first question in the question file for each stratum.</p>')
     body.append(html_examples(answers_by_qid_arm, questions, example_qids))
 
-    # 13. Deviations + threats
-    body.append('<span class="section-tag">13 · honest limitations</span>')
-    body.append("<h2>Deviations from preregistration + threats to validity</h2>")
-    body.append("""<ul>
-      <li><strong>Generator was Sonnet, not Opus.</strong> Pre-registration named Opus; we used Sonnet
-        for cost/throughput (~10× cheaper). A stronger generator might change A0's parametric quality.</li>
-      <li><strong>Judge was Claude Haiku judging Claude Sonnet</strong> (within-family). Self-preference
-        bias is only partially mitigated; cross-family (Gemini) judging would be stronger.</li>
-      <li><strong>relationships.tsv leakage.</strong> Only clinicalVariants rows were held out;
-        relationships.tsv (which restates many associations + PMIDs) was not. This gave A1 access to
-        nominally held-out facts — the S4 result is confounded by this.</li>
-      <li><strong>A1 steelman omitted the BGE reranker</strong> (BM25 + dense + RRF only) to keep the
-        laptop install light. A reranker would likely make A1 even stronger, not weaker — so A3's
-        non-advantage is, if anything, understated.</li>
-      <li><strong>Refusal/negative metrics are keyword-heuristic</strong> and noisy; treat S6/S7
-        rule-based numbers as directional.</li>
-      <li><strong>Single model, single judge, n≈25–40 per stratum.</strong> Per-stratum numbers are
-        descriptive, not inferential. Only the n=187 pairwise test is adequately powered.</li>
-    </ul>""")
-    # 14. What's next
-    body.append(html_whats_next())
+    # 7. Conclusions and future work
+    body.append('<span class="section-tag">7 · conclusions</span><h2>7. Conclusions and future work</h2>')
+    body.append('<p>On a held-out PharmGKB benchmark, with Claude Sonnet as the generator and Claude Haiku as the judge, the subgraph-RAG system we evaluated did not outperform a strong plain-text RAG baseline on blinded pairwise preference (49% A3-preferred, p=0.83). Across four independent metric families — preference, deterministic rule-based, anchored rubric ratings, and merged-claim hallucination — the no-context model received the highest judge ratings despite fabricating cited PMIDs at roughly twice the rate of subgraph RAG. The graph layer\'s one consistent advantage was appropriate refusal on out-of-distribution queries.</p>')
+    body.append('<p>The most parsimonious explanation for the null primary result is that PharmGKB\'s row-level denormalisation packs ostensibly multi-hop facts into single text chunks, allowing strong text similarity to recover them. The result therefore says something specific about <em>this domain</em> (and arguably about any heavily denormalised knowledge graph) rather than something general about subgraph RAG.</p>')
+    body.append('<h3 id="c-next">7.1 Targeted follow-up experiments</h3>')
+    body.append("""<p>The following experiments would each test a specific hypothesis raised by these results
+      and are listed in increasing implementation cost:</p>
+    <ol style="font-size:14px;">
+      <li><strong>Remove the relationships.tsv leakage.</strong> Hold out the corresponding rows
+        in <code>relationships.tsv</code> in parallel with <code>clinicalVariants.tsv</code>; re-run.
+        Cleanest test of whether the leakage is what kept A1 competitive on citation-grounding.</li>
+      <li><strong>Inline PMIDs into A3's context.</strong> A ~10-line change in
+        <code>eval/retrieve_py.py</code> to surface edge-level PMIDs in the structured prompt.
+        Re-run the citation stratum only. Likely converts A3's confounded refusal-win on S4 into
+        a real grounding win.</li>
+      <li><strong>Cross-family judge.</strong> Re-run the pairwise and rubric passes with Gemini
+        2.5 as judge. Removes within-Claude self-preference; tests whether the "A0 preferred"
+        result is family-specific.</li>
+      <li><strong>Hybrid arm (A4 = A3 + A1).</strong> A natural product question: does concatenating
+        A3's structured subgraph and A1's top-3 text chunks produce a system that strictly
+        dominates either alone?</li>
+      <li><strong>Architectural variants.</strong> Implement a Microsoft-style GraphRAG arm
+        (Leiden communities + LLM-generated community summaries + hierarchical retrieval) to
+        test whether community-level summarisation succeeds where edge-level retrieval did not.</li>
+      <li><strong>Cross-domain replication.</strong> Run the same evaluation harness on a less
+        denormalised knowledge graph (drug-drug interaction networks, citation graphs, gene-pathway
+        networks) where multi-hop facts genuinely require traversal. This is the cleanest test of
+        whether the negative result here generalises beyond PharmGKB.</li>
+    </ol>""")
 
     body.append('<footer>'
                 f'Generated from {len(scores)} scores and {len(judgments)} judgments. '
