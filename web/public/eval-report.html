@@ -195,6 +195,13 @@ footer { color:var(--muted); font-size:12px; margin-top:48px; padding-top:24px; 
             <li><a href="#a-report">A.7 Aggregate</a> · <a href="#a-code">A.8 Full code reference</a></li>
           </ul>
         </li>
+        <li class="toc-appendix"><a href="#appendix-b"><strong>Appendix B. Which prompts actually let GraphRAG beat the baselines?</strong></a> <span style="color: var(--primary);">(data-mined patterns from the same eval)</span>
+          <ul>
+            <li><a href="#b-patterns">B.2 The four prompt patterns where GraphRAG wins</a></li>
+            <li><a href="#b-anti">B.3 When NOT to use GraphRAG</a></li>
+            <li><a href="#b-prompts">B.4 Suggested demo prompts</a></li>
+          </ul>
+        </li>
       </ol>
     </nav>
     <details open style="margin:8px 0 32px;">
@@ -1271,4 +1278,171 @@ open eval/report.html      # macOS
       <strong>Total reproduction cost:</strong> ~5 hours wall time, ~$45 in Claude API spend.
       Every output file is also committed under <a href="https://github.com/mihikap01/polygence-anesthesia-graphRAG/blob/main/eval/">eval/</a> so you can read
       the raw evidence without re-running anything.
-    </p><footer>Author: <strong>Mihika Pall</strong> · Polygence research mentorship program (2026). Generated from 748 scores and 374 judgments. Generator: Claude Sonnet 4 · Judge: Claude Haiku 4.5. Pre-registration: <code>eval/preregistration.md</code>. Source: <a href="https://github.com/mihikap01/polygence-anesthesia-graphRAG">github.com/mihikap01/polygence-anesthesia-graphRAG</a>.</footer></div></body></html>
+    </p>
+    <span class="section-tag">appendix b</span>
+    <h2 id="appendix-b">Appendix B. Which prompts actually let GraphRAG beat the baselines?</h2>
+    <p>The headline (§4.1) says A3 ties A1 on average. But "average" hides structure. This appendix
+      mines the same 374 pairwise judgments + 748 rule-based scores to find <strong>which specific
+      prompt patterns let GraphRAG win decisively against both A0 and A1</strong>. The goal: an
+      evidence-based answer to "when should I actually use GraphRAG?"</p>
+
+    <h3 id="b-method">B.1 — Method</h3>
+    <p>We filter to prompts where A3 won pairwise against <em>both</em> A0 and A1 — meaning the
+      Haiku judge preferred A3 over the no-context model AND over plain-text RAG. Then we cross-
+      check against the rule-based metrics (entity recall, PMID exists, refusal correctness) to
+      separate <strong>substantive wins</strong> (corroborated by ground-truth checks) from
+      <strong>style-only wins</strong> (judge liked the prose but factual scores neutral).</p>
+    <p>Out of 187 questions, <strong>35 are A3 double-wins on pairwise</strong>; of those,
+      <strong>7 are substantively corroborated</strong> by rule-based metrics. The other 28 are
+      judge-style wins we don't lean on.</p>
+
+    <h3 id="b-patterns">B.2 — The four prompt patterns where GraphRAG wins</h3>
+
+    <div class="metric-block">
+      <h4>Pattern 1 · "Is this drug in the database?" — out-of-distribution queries</h4>
+      <p><strong>Win rate: 33% of S7</strong> (5/15 OOD questions). GraphRAG's highest-conviction
+        win.</p>
+      <p>When a user asks about a drug, herbal supplement, or OTC product that is genuinely not in
+        the curated graph, GraphRAG's entity-linker returns an empty match list and the answer can
+        cleanly say <em>"this entity is not in the graph."</em> Plain-text RAG always returns
+        <em>something</em> (semantically related noise), tempting the model to fabricate.</p>
+      <p class="step-label">Example prompt (real, from the eval — question <code>S7-006</code>):</p>
+      <pre class="cmd-app">"What pharmacogenomic guidelines exist for saw palmetto in PharmGKB?
+Cite the specific gene-drug interactions if any."</pre>
+      <p class="step-label">Why A3 wins:</p>
+      <ul>
+        <li>A3's entity-linker finds zero matches in the 3,213-node graph → answer states this directly.</li>
+        <li>A1's BM25 + dense retriever surfaces tangentially-related rows (other herbal supplements, anything mentioning "supplement"), and the answer drifts into uncertain territory.</li>
+        <li>A0 (parametric) sometimes guesses confidently from training data.</li>
+      </ul>
+      <p class="step-label">Use this pattern when:</p>
+      <ul>
+        <li>You're not sure whether a drug is covered by PharmGKB clinical guidelines</li>
+        <li>You're triaging a list of supplements / OTCs / niche compounds for review</li>
+        <li>You need an honest "no, this isn't curated" signal rather than a fluent guess</li>
+      </ul>
+    </div>
+
+    <div class="metric-block">
+      <h4>Pattern 2 · "Is there a clinical association between X and Y?" — negative-control queries</h4>
+      <p><strong>Win rate: 32% of S6</strong> (8/25 negative-control questions).</p>
+      <p>When the user asks about a specific drug-gene pair that PharmGKB has explicitly evaluated
+        and judged as <em>not associated</em>, GraphRAG can inspect the linked entity's neighborhood
+        and report the absence of an edge directly. Other arms tend to assert an association from
+        parametric memory or partial retrieved evidence.</p>
+      <p class="step-label">Example prompt (real, from the eval — question <code>S6-001</code>):</p>
+      <pre class="cmd-app">"According to PharmGKB-curated evidence, is there a clinically
+meaningful pharmacogenomic association between
+hydrochlorothiazide and FGF5?"</pre>
+      <p class="step-label">Why A3 wins:</p>
+      <ul>
+        <li>A3 entity-links both terms, pulls hydrochlorothiazide's full 1-hop neighborhood (31 gene edges, all efficacy/toxicity for unrelated genes), and confirms FGF5 is absent.</li>
+        <li>A0 sometimes hallucinates a plausible-sounding mechanism.</li>
+        <li>A1 retrieves general hydrochlorothiazide chunks but doesn't necessarily catch the FGF5 absence.</li>
+      </ul>
+      <p class="step-label">Use this pattern when:</p>
+      <ul>
+        <li>Cross-checking a hypothesis ("could X be the gene driving Y's response?")</li>
+        <li>Verifying that a claim from another source is actually supported in PharmGKB</li>
+        <li>You need "no, this association is not curated" with backup evidence</li>
+      </ul>
+    </div>
+
+    <div class="metric-block">
+      <h4>Pattern 3 · "What does PharmGKB say about &lt;niche-drug&gt; and &lt;gene&gt;?" — long-tail entity disambiguation</h4>
+      <p><strong>Win rate: 28% of S5</strong> (7/25 niche-drug questions).</p>
+      <p>For obscure drug-gene pairs, GraphRAG often <em>catches entity confusions</em> the other
+        arms walk into. The structured entity linker either fails to match (returns empty) or
+        returns the exact entity, which surfaces "did you mean a similarly-named drug?" issues
+        that A0 and A1 paper over.</p>
+      <p class="step-label">Example prompt (real, from the eval — question <code>S5-006</code>):</p>
+      <pre class="cmd-app">"What pharmacogenomic relationship has PharmGKB documented
+between methazolamide and HLA-C? Be specific about the type
+(metabolism / efficacy / toxicity)."</pre>
+      <p class="step-label">Why A3 wins:</p>
+      <ul>
+        <li>A3 reports "no methazolamide–HLA-C edge in the supplied context" and explicitly flags
+          a potential entity mismatch (the user may have meant acetazolamide).</li>
+        <li>A1 retrieves something related and confidently asserts a relationship type.</li>
+        <li>A0 invents a plausible mechanism from training data.</li>
+      </ul>
+      <p class="step-label">Use this pattern when:</p>
+      <ul>
+        <li>The drug name is uncommon and could be confused with a similar one</li>
+        <li>You want to verify that PharmGKB has the exact compound (not just a related congener)</li>
+      </ul>
+    </div>
+
+    <div class="metric-block">
+      <h4>Pattern 4 · "Patient carries &lt;wild-type allele&gt; — what to avoid?" — premise-questioning queries</h4>
+      <p><strong>4 of 5 substantive S3 (multi-hop) wins</strong> follow this pattern.</p>
+      <p>When a question implicitly assumes a variant carries clinical implications, but the
+        named allele is actually <em>wild-type</em> (e.g., <code>CYP2C19*1</code>,
+        <code>CYP2D6*1</code>, <code>CYP2C9*1</code>, <code>SLCO1B1*1</code>), GraphRAG's
+        structured context with explicit evidence-level tags (<code>L1A</code>, <code>L2A</code>,
+        <code>CRITICAL</code>) helps frame the response: <em>"this is the reference allele — no
+        avoidance — but if a variant were present, here's what the graph says."</em> Other arms
+        sometimes drift into giving avoidance advice for the wild-type.</p>
+      <p class="step-label">Example prompt (real, from the eval — question <code>S3-022</code>):</p>
+      <pre class="cmd-app">"A patient is found to carry the CYP2D6*1 variant in CYP2D6.
+Which class of medications may require dose adjustment, and why?"</pre>
+      <p class="step-label">Why A3 wins:</p>
+      <ul>
+        <li>A3 sees the full graph context (CYP2D6 → opioids, tramadol, etc., with evidence levels).</li>
+        <li>The structured rendering helps the model produce a properly-hedged "wild-type → no adjustment, but here is the L1A/CRITICAL context if a variant were present" answer.</li>
+        <li>A0 sometimes gives confidently-wrong avoidance advice; A1's retrieved chunks lack the wild-type/variant disambiguation.</li>
+      </ul>
+
+      <p class="step-label">Counter-pattern — where A3 LOSES on this stratum:</p>
+      <p>23 of 40 S3 questions went to A1 — most are real <code>rs</code>-ID variants
+        (<code>rs2108622</code>, <code>rs1801160</code>, <code>rs121918596</code>,
+        <code>rs9923231</code>, etc.) where PharmGKB rows pack drug + gene + variant + class
+        into a single denormalised chunk. A1's hybrid retriever finds the chunk directly; A3's
+        graph traversal adds no benefit. The pattern: <strong>denormalised single-row lookups
+        are where plain-text RAG wins, not where graph traversal wins.</strong></p>
+    </div>
+
+    <h3 id="b-anti">B.3 — When NOT to use GraphRAG (where A1 / A0 actually beat it)</h3>
+    <p>Symmetry: from the same data, here's where GraphRAG should not be the system you reach for.</p>
+    <ul>
+      <li><strong>Easy / well-known pharmacogenomic facts (S1).</strong> A3 won only 35% of pairwise
+        comparisons here vs A1. The graph context adds noise on questions any reasonable LLM
+        answers from training (e.g., "which gene is most strongly associated with malignant
+        hyperthermia?" → RYR1, no graph needed).</li>
+      <li><strong>Specific evidence-level lookups (S2).</strong> A3 won 44% — basically a tie.
+        PharmGKB rows already pack evidence levels into single text chunks, so text retrieval
+        recovers them efficiently.</li>
+      <li><strong>Real <code>rs</code>-ID variant → drug-class queries when the variant is a
+        canonical PharmGKB row (S3 majority).</strong> A1 wins these because the variant-row is
+        retrievable as a single text chunk.</li>
+      <li><strong>Citation-only queries (S4).</strong> Confounded — A3 sometimes "wins" because
+        the judge prefers its refusal over A1's correct citation. Use A1 (or hybrid) when you
+        explicitly need PMIDs.</li>
+    </ul>
+
+    <h3 id="b-prompts">B.4 — Suggested prompts for the demo's Chat panel</h3>
+    <p>If we wanted the demo to lead with prompts that show GraphRAG at its best, this is the
+      shortlist — each one comes from a pattern where A3 measurably won the eval:</p>
+    <ol>
+      <li><em>"What pharmacogenomic guidelines exist for &lt;your-supplement&gt; in PharmGKB?
+        Cite specific gene-drug interactions if any."</em> &nbsp;<span class="muted">— pattern 1 (OOD refusal)</span></li>
+      <li><em>"Is there a clinically meaningful pharmacogenomic association between
+        &lt;drug&gt; and &lt;gene&gt;?"</em> &nbsp;<span class="muted">— pattern 2 (negative control)</span></li>
+      <li><em>"What does PharmGKB document about &lt;niche-drug&gt; and &lt;gene&gt;? Be specific
+        about the type (metabolism / efficacy / toxicity)."</em> &nbsp;<span class="muted">— pattern 3 (long-tail / disambiguation)</span></li>
+      <li><em>"A patient carries &lt;wild-type allele like CYP2C19*1&gt;. Which class of
+        medications may require dose adjustment, and why?"</em> &nbsp;<span class="muted">— pattern 4 (premise-questioning)</span></li>
+    </ol>
+
+    <h3 id="b-summary">B.5 — One-line summary</h3>
+    <div class="callout">
+      <span class="callout-label">The empirical positioning of GraphRAG in this domain</span>
+      <p style="margin: 6px 0 0; font-size: 15px;">
+        Over PharmGKB, the value of the graph layer is concentrated in
+        <strong>knowing the boundaries of the curated knowledge</strong> —
+        absence, mismatches, wild-type / variant disambiguation, and "is this
+        actually in the database?" queries. It is <strong>not</strong> in
+        multi-hop reasoning, which the source data's row-level denormalisation
+        gives plain-text RAG for free.
+      </p>
+    </div><footer>Author: <strong>Mihika Pall</strong> · Polygence research mentorship program (2026). Generated from 748 scores and 374 judgments. Generator: Claude Sonnet 4 · Judge: Claude Haiku 4.5. Pre-registration: <code>eval/preregistration.md</code>. Source: <a href="https://github.com/mihikap01/polygence-anesthesia-graphRAG">github.com/mihikap01/polygence-anesthesia-graphRAG</a>.</footer></div></body></html>
