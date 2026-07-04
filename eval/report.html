@@ -200,6 +200,8 @@ footer { color:var(--muted); font-size:12px; margin-top:48px; padding-top:24px; 
             <li><a href="#b-patterns">B.2 The four prompt patterns where GraphRAG wins</a></li>
             <li><a href="#b-anti">B.3 When NOT to use GraphRAG</a></li>
             <li><a href="#b-prompts">B.4 Suggested demo prompts</a></li>
+            <li><a href="#b-followup"><strong>B.5 Candidate prompts run through the harness</strong></a> <span style="color: var(--primary);">(the 4 winners)</span></li>
+            <li><a href="#b-summary">B.6 One-line summary</a></li>
           </ul>
         </li>
       </ol>
@@ -1434,7 +1436,43 @@ Which class of medications may require dose adjustment, and why?"</pre>
         medications may require dose adjustment, and why?"</em> &nbsp;<span class="muted">— pattern 4 (premise-questioning)</span></li>
     </ol>
 
-    <h3 id="b-summary">B.5 — One-line summary</h3>
+    <h3 id="b-followup">B.5 — Follow-up: candidate prompts run through the same eval harness</h3>
+    <p>To test whether the B.2 patterns really do favour GraphRAG, we designed 15 <em>new</em>
+      candidate prompts (never seen by the eval), ran them through the same 3 arms (Sonnet
+      generator) and the same blinded pairwise judge (Haiku) — this time over the
+      <em>full production graph</em>, not the held-out one. Raw evidence:
+      <a href="https://github.com/mihikap01/polygence-anesthesia-graphRAG/blob/main/eval/candidates.jsonl">eval/candidates.jsonl</a> ·
+      <a href="https://github.com/mihikap01/polygence-anesthesia-graphRAG/blob/main/eval/candidate_answers.jsonl">eval/candidate_answers.jsonl</a> ·
+      <a href="https://github.com/mihikap01/polygence-anesthesia-graphRAG/blob/main/eval/candidate_judgments.jsonl">eval/candidate_judgments.jsonl</a>.</p>
+    <p class="muted" style="font-size:12px;margin-bottom:2px;">Table B.1 — Candidate results per pattern (3 prompts each, judged blinded).</p>
+    <table>
+      <thead><tr><th>Pattern (from B.2)</th><th class="right">A3 vs A1 win rate</th><th class="right">A3 vs A0 win rate</th></tr></thead>
+      <tbody>
+        <tr class="highlight"><td><strong>Wild-type premise</strong></td><td class="right"><strong>3/3 (100%)</strong></td><td class="right">1/3 (33%)</td></tr>
+        <tr class="highlight"><td><strong>Negative control</strong></td><td class="right"><strong>2/3 (67%)</strong></td><td class="right"><strong>3/3 (100%)</strong></td></tr>
+        <tr><td>Edge-absence probe (new pattern)</td><td class="right">0/3 (0%)</td><td class="right">2/3 (67%)</td></tr>
+        <tr><td>Long-tail disambiguation</td><td class="right">1/3 (33%)</td><td class="right">1/3 (33%)</td></tr>
+        <tr><td>OOD refusal</td><td class="right">0/3 (0%)</td><td class="right">1/3 (33%)</td></tr>
+      </tbody>
+    </table>
+    <p><strong>What generalised, what didn't.</strong> The two patterns from the main eval that
+      most cleanly beat plain-text RAG were <em>wild-type premise</em> (100%) and
+      <em>negative controls</em> (67%). OOD refusal (which was Pattern 1's headline in the main
+      eval) did <em>not</em> generalise here — with a well-tuned production A1 index it retrieves
+      enough context to answer the "no guideline exists" question sensibly, and A3's structured
+      empty-neighborhood signal doesn't dominate.</p>
+    <div class="callout">
+      <span class="callout-label">Four candidate prompts where GraphRAG beat BOTH A0 and A1</span>
+      <ol style="margin: 4px 0; font-size: 14px;">
+        <li><em>"A patient carries the <strong>TPMT*1</strong> allele. Which class of medications should be avoided, and why?"</em> &nbsp;<span class="muted">(wild-type premise)</span></li>
+        <li><em>"Is there a curated PharmGKB pharmacogenomic association between <strong>amoxicillin and VKORC1</strong>?"</em> &nbsp;<span class="muted">(negative control)</span></li>
+        <li><em>"Based on PharmGKB curated evidence, does the graph contain a clinically meaningful pharmacogenomic association between <strong>ibuprofen and BCHE</strong>?"</em> &nbsp;<span class="muted">(negative control)</span></li>
+        <li><em>"What PharmGKB-documented pharmacogenomic relationship exists between <strong>selegilline and CYP2B6</strong>?"</em> &nbsp;<span class="muted">(disambiguation — user meant selegiline)</span></li>
+      </ol>
+      <p style="margin: 8px 0 0; font-size: 13px;">These are our <strong>demonstration prompts</strong> — try them on the live demo and you'll see the pattern the eval identified.</p>
+    </div>
+
+    <h3 id="b-summary">B.6 — One-line summary</h3>
     <div class="callout">
       <span class="callout-label">The empirical positioning of GraphRAG in this domain</span>
       <p style="margin: 6px 0 0; font-size: 15px;">
