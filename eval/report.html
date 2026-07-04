@@ -143,6 +143,28 @@ ul.meta-list code { background: var(--accent-bg); padding: 1px 5px; border-radiu
   font-size: 11px; text-transform: uppercase; letter-spacing: .07em;
   color: var(--muted); font-weight: 600; margin: 14px 0 4px;
 }
+.mechanism-box {
+  background: linear-gradient(135deg, hsl(195 50% 96%), hsl(150 40% 96%));
+  border: 1px solid hsl(195 35% 78%);
+  border-left: 4px solid hsl(195 35% 42%);
+  border-radius: 0 12px 12px 0;
+  padding: 14px 18px;
+  margin: 6px 0 8px;
+  font-size: 14px;
+}
+.mechanism-box > p:first-child {
+  margin-top: 0;
+  font-size: 14.5px;
+  color: hsl(195 35% 25%);
+}
+.mechanism-box strong { color: hsl(215 20% 18%); }
+.mechanism-box ul { margin: 8px 0; padding-left: 20px; font-size: 13.5px; }
+.mechanism-box li { margin: 4px 0; }
+.mechanism-box code {
+  background: rgba(255,255,255,0.6);
+  padding: 1px 5px; border-radius: 4px; font-size: 12.5px;
+}
+.mechanism-box p:last-child { margin-bottom: 0; font-size: 13.5px; }
 footer { color:var(--muted); font-size:12px; margin-top:48px; padding-top:24px; border-top:1px solid var(--border); }
 @media (max-width:680px) {
   .arm-card-grid, .examples { grid-template-columns:1fr; }
@@ -1324,6 +1346,24 @@ Cite the specific gene-drug interactions if any."</pre>
         <li>You're triaging a list of supplements / OTCs / niche compounds for review</li>
         <li>You need an honest "no, this isn't curated" signal rather than a fluent guess</li>
       </ul>
+      <p class="step-label">Why this works — the mechanism:</p>
+      <div class="mechanism-box">
+        <p><strong>Graph traversal can prove <em>absence</em>; text similarity cannot.</strong></p>
+        <p>The retrieval pipelines behave asymmetrically when a query concerns a missing entity:</p>
+        <ul>
+          <li><strong>A1 (text search)</strong> always returns its top-K nearest chunks by
+            cosine similarity — even the least-similar match still comes back. The LLM sees
+            <em>something</em> in its context and reads that as "yes, there's data here."</li>
+          <li><strong>A3 (graph traversal)</strong> begins with entity linking: a discrete
+            lookup against the 3,213-node search index. If no node matches at the required
+            similarity threshold, the result is <em>an empty list</em> — a distinct signal
+            that the entity is not represented, which flows into the prompt verbatim as
+            <code>ENTITY LINKING: no specific graph entities matched.</code></li>
+        </ul>
+        <p>The empty result is a <em>truth-preserving</em> signal that maps 1:1 onto the
+          correct answer ("no, it isn't in the graph"). A1's non-empty result is a
+          <em>truth-obscuring</em> signal that misleads the LLM into speculating.</p>
+      </div>
     </div>
 
     <div class="metric-block">
@@ -1349,6 +1389,29 @@ hydrochlorothiazide and FGF5?"</pre>
         <li>Verifying that a claim from another source is actually supported in PharmGKB</li>
         <li>You need "no, this association is not curated" with backup evidence</li>
       </ul>
+      <p class="step-label">Why this works — the mechanism:</p>
+      <div class="mechanism-box">
+        <p><strong>Neighborhood enumeration turns "is there an edge?" into a bounded set-membership test.</strong></p>
+        <p>The question <em>"is there an association between X and Y?"</em> requires proving a
+          negative — the hardest thing for a language model to do reliably, because absence
+          rarely has direct textual evidence.</p>
+        <ul>
+          <li><strong>A3's context</strong> for this question includes X's full 1-hop
+            neighborhood: <em>every</em> edge incident to X, each labelled with its type and
+            evidence level. That's a <em>closed</em> set. The LLM can literally scan the set
+            for Y — if Y is present, it's supported; if Y is absent, that too is grounded in
+            the context.</li>
+          <li><strong>A1's context</strong> is the top-K text chunks about X — an <em>open</em>
+            set. The LLM cannot conclude that "Y is absent from the top 8 chunks" implies "Y
+            is not associated," because the retriever may have missed the relevant chunk.
+            Uncertainty spirals into hedging.</li>
+          <li><strong>A0</strong> has no closed set at all — it must recall a fact it may
+            never have seen.</li>
+        </ul>
+        <p>The concrete win, from the eval: A3's answer explicitly cited "31 gene edges, none
+          are FGF5" — a claim only makes sense against a closed-set context. A1 could only
+          say "none of the 8 retrieved chunks mention FGF5," which is weaker evidence.</p>
+      </div>
     </div>
 
     <div class="metric-block">
@@ -1374,6 +1437,31 @@ between methazolamide and HLA-C? Be specific about the type
         <li>The drug name is uncommon and could be confused with a similar one</li>
         <li>You want to verify that PharmGKB has the exact compound (not just a related congener)</li>
       </ul>
+      <p class="step-label">Why this works — the mechanism:</p>
+      <div class="mechanism-box">
+        <p><strong>Discrete node lookup surfaces "did-you-mean" errors that dense retrieval smooths over.</strong></p>
+        <p>Text embeddings are optimised to bring semantically similar things together. That's
+          the right behaviour when the retriever's job is to find <em>relevant</em> chunks — but
+          it's the <em>wrong</em> behaviour when the LLM needs to know whether the user's exact
+          entity name is correct.</p>
+        <ul>
+          <li><strong>A1's retriever</strong> maps <code>"methazolamide"</code> to embeddings
+            that are cosine-close to <code>"acetazolamide"</code> — same drug class, same
+            metabolic pathway. It returns acetazolamide chunks, and the LLM produces a fluent
+            answer that treats them as if they were about methazolamide. The disambiguation
+            error is silent.</li>
+          <li><strong>A3's entity linker</strong> does exact + fuzzy string matching with a
+            tight threshold (score &le; 0.18). Near-misses fail to link. When methazolamide
+            fails to match and acetazolamide is not in the question, the linker returns
+            just <code>HLA-C</code> — the LLM sees a lopsided context and can flag: <em>"the
+            drug you named isn't in the graph."</em></li>
+          <li><strong>A0</strong> has no retrieval feedback at all and answers as if the
+            user's spelling is authoritative.</li>
+        </ul>
+        <p>The concrete win, from the eval: A3 explicitly noted <em>"catches the critical entity
+          mismatch: acetazolamide vs. methazolamide"</em> — a signal only the discrete linker
+          can produce.</p>
+      </div>
     </div>
 
     <div class="metric-block">
@@ -1396,6 +1484,32 @@ Which class of medications may require dose adjustment, and why?"</pre>
         <li>A0 sometimes gives confidently-wrong avoidance advice; A1's retrieved chunks lack the wild-type/variant disambiguation.</li>
       </ul>
 
+      <p class="step-label">Why this works — the mechanism:</p>
+      <div class="mechanism-box">
+        <p><strong>Structured evidence-level tags travel intact through the prompt; prose retrieval strips them.</strong></p>
+        <p>Correctly answering <em>"patient has CYP2D6*1, what to avoid?"</em> requires the
+          model to (a) recognise <code>*1</code> is wild-type, (b) hedge properly — no specific
+          avoidance is warranted — and (c) offer the L1A/CRITICAL context that <em>would</em>
+          apply if a real variant were present. The third step needs evidence-level metadata,
+          not prose.</p>
+        <ul>
+          <li><strong>A3's rendered subgraph</strong> puts the metadata inline, one per line:
+            <code>sevoflurane --is linked to risk of[L1A, CRITICAL]--&gt; RYR1</code>. Every
+            edge is tagged. The LLM can copy the tags into its answer verbatim — "the L1A
+            CRITICAL context around this gene is X, Y, Z" — without having to remember or
+            reconstruct them.</li>
+          <li><strong>A1's text chunks</strong> contain the same metadata but scattered across
+            prose descriptions of clinical variants. The tokens <code>1A</code> and
+            <code>CRITICAL</code> aren't near their subject; the LLM has to reconstruct the
+            binding relationally, and often drops or misattributes evidence levels in the
+            summary.</li>
+          <li><strong>A0</strong> has no evidence levels at all — it either omits them (vague
+            answer) or invents them (confidently wrong).</li>
+        </ul>
+        <p>Judge reasons in the eval consistently praised A3's answers for "including exact
+          evidence-level classifications (L1A CRITICAL, L2A) that align with actual
+          CPIC/PharmGKB standards" — that fidelity is what the structured rendering buys.</p>
+      </div>
       <p class="step-label">Counter-pattern — where A3 LOSES on this stratum:</p>
       <p>23 of 40 S3 questions went to A1 — most are real <code>rs</code>-ID variants
         (<code>rs2108622</code>, <code>rs1801160</code>, <code>rs121918596</code>,
