@@ -201,7 +201,8 @@ footer { color:var(--muted); font-size:12px; margin-top:48px; padding-top:24px; 
             <li><a href="#b-anti">B.3 When NOT to use GraphRAG</a></li>
             <li><a href="#b-prompts">B.4 Suggested demo prompts</a></li>
             <li><a href="#b-followup"><strong>B.5 Candidate prompts run through the harness</strong></a> <span style="color: var(--primary);">(the 4 winners)</span></li>
-            <li><a href="#b-summary">B.6 One-line summary</a></li>
+            <li><a href="#b-framework"><strong>B.6 A general framework — what kind of prompt favours GraphRAG</strong></a> <span style="color: var(--primary);">(rubric + 3 templates)</span></li>
+            <li><a href="#b-summary">B.7 One-line summary</a></li>
           </ul>
         </li>
       </ol>
@@ -1472,7 +1473,112 @@ Which class of medications may require dose adjustment, and why?"</pre>
       <p style="margin: 8px 0 0; font-size: 13px;">These are our <strong>demonstration prompts</strong> — try them on the live demo and you'll see the pattern the eval identified.</p>
     </div>
 
-    <h3 id="b-summary">B.6 — One-line summary</h3>
+    <h3 id="b-framework">B.6 — A general framework: what kind of prompt should favour GraphRAG?</h3>
+    <p>Looking across every winning candidate (the 4 double-winners plus the 6 single-arm winners),
+      a mechanism-level pattern emerges. GraphRAG wins when the prompt requires an answer that
+      depends on <strong>a small, specific subgraph the LLM cannot reproduce from memory</strong>
+      — not when it requires generation from a large body of related text (which text retrieval
+      does fine).</p>
+
+    <p>Concretely, GraphRAG's advantage is largest when <em>all</em> three of these are true:</p>
+
+    <ol style="font-size:14.5px;">
+      <li><strong>The named entities are in the graph but the <em>edge</em> between them is not.</strong>
+        The value is negative information — "these two things exist as nodes, but no relationship
+        connects them." Text retrieval cannot easily produce absence; it always returns
+        <em>something</em> and the LLM interprets that as evidence. GraphRAG's entity-linker
+        finds both nodes, its neighborhood expansion enumerates every actual edge, and the model
+        can honestly report the missing one.</li>
+      <li><strong>The correct answer needs to distinguish similar-looking entities.</strong>
+        Wild-type vs. variant alleles (<code>CYP2C9*1</code> vs. <code>CYP2C9*3</code>), a
+        misspelled drug name that resolves to a different entity, a chemical vs. its
+        formulation. GraphRAG's exact-node lookup — "does the graph have this exact string?" —
+        forces the LLM to face the disambiguation. Text similarity papers over near-misses.</li>
+      <li><strong>Structured metadata on the edges matters.</strong> Evidence levels
+        (<code>1A</code>, <code>1B</code>, <code>L2A</code>), CRITICAL flags, edge types
+        (<code>can_trigger</code>, <code>affects_response_to</code>). GraphRAG's context surfaces
+        these as inline tags on every edge, giving the LLM material to hedge, prioritise, or
+        refuse with. Text retrieval loses them in prose flow.</li>
+    </ol>
+
+    <p>If <em>none</em> of these are true — the question is about a well-known drug-gene pair, a
+      single canonical row in a denormalised table, or a "list all X" that any text search can
+      answer — plain-text RAG will typically match or beat GraphRAG.</p>
+
+    <h4>A simple predictive checklist</h4>
+    <p>Score a candidate prompt on these 4 questions before spending compute to evaluate it:</p>
+    <table>
+      <thead><tr><th>Question</th><th>If yes, favours GraphRAG because…</th></tr></thead>
+      <tbody>
+        <tr><td>Does the prompt ask about the <em>absence</em> or <em>presence</em> of a specific relationship?</td><td>Absence is what graph traversal proves cleanly.</td></tr>
+        <tr><td>Does the correct answer hinge on distinguishing two similar entities (typos, wild-type vs. variant, class members)?</td><td>Exact node-lookup catches what fuzzy text retrieval misses.</td></tr>
+        <tr><td>Would a good answer explicitly reference evidence levels (1A / 2B / CRITICAL) or edge types?</td><td>Structured tags flow inline through A3's context; A1 buries them in prose chunks.</td></tr>
+        <tr><td>Is the total set of relevant facts small enough to fit in a 1–2 hop neighborhood (&lt; ~30 edges)?</td><td>GraphRAG's window; larger scopes overwhelm the structured context and A1 wins on recall.</td></tr>
+      </tbody>
+    </table>
+    <p><strong>Rule of thumb:</strong> 3+ yeses → GraphRAG should win. 1 yes → plain-text RAG probably wins.</p>
+
+    <h4>Three reusable templates</h4>
+    <p>Fill in the slots with your own entities. Each template has been confirmed by our judge
+      on at least one candidate prompt.</p>
+
+    <div class="metric-block">
+      <h4 style="color:var(--primary);">Template T1 — "Is there an edge from X to Y?"</h4>
+      <pre class="cmd-app">"Is there a curated PharmGKB pharmacogenomic association
+between {DRUG} and {GENE}?"
+
+# variants:
+"Does the PharmGKB knowledge graph document any direct
+pharmacogenomic association between {A} and {B}?"
+
+"According to PharmGKB curated evidence, is there a clinically
+meaningful association between {A} and {B}?"</pre>
+      <p>Best when <code>{A}</code> and <code>{B}</code> are both real graph entities but not
+        directly connected. Judge wins: <strong>C-NEG-2</strong> (amoxicillin, VKORC1),
+        <strong>C-NEG-3</strong> (ibuprofen, BCHE), <strong>C-EDGE-2</strong> (codeine, RYR1).</p>
+    </div>
+
+    <div class="metric-block">
+      <h4 style="color:var(--primary);">Template T2 — "The premise names a reference / wild-type entity"</h4>
+      <pre class="cmd-app">"A patient carries the {GENE}*1 allele. Which class of
+medications should be avoided, and why?"
+
+# variants:
+"A patient is confirmed to carry the {GENE}*1/*1 genotype.
+Which medications may need dose adjustment, and why?"
+
+"A patient's genotype is {GENE}*1/*1. Which class of
+medications should be avoided?"</pre>
+      <p>Best when the named allele is actually wild-type (<code>*1</code>), or when the
+        question's premise is subtly wrong. GraphRAG's evidence-tagged neighborhood helps the
+        model correctly say "this is wild-type; the L1A/CRITICAL context you'd want lives
+        elsewhere in the graph." Judge wins: <strong>C-WT-1</strong>, <strong>C-WT-2</strong>,
+        <strong>C-WT-3</strong>.</p>
+    </div>
+
+    <div class="metric-block">
+      <h4 style="color:var(--primary);">Template T3 — "What does PharmGKB say about {niche-drug} and {gene}?"</h4>
+      <pre class="cmd-app">"What PharmGKB-documented pharmacogenomic relationship exists
+between {DRUG} and {GENE}? Specify the type
+(metabolism / efficacy / toxicity)."</pre>
+      <p>Best when <code>{DRUG}</code> is a rare, niche, or slightly misspelled name and
+        <code>{GENE}</code> is real. The exact-node lookup catches the mismatch. Judge win:
+        <strong>C-DIS-3</strong> (selegilline vs selegiline).</p>
+    </div>
+
+    <h4>How to test your own prompt</h4>
+    <ol style="font-size:14px;">
+      <li><strong>Add it to <code>eval/candidates.jsonl</code></strong> — one JSON line with fields
+        <code>id</code>, <code>pattern</code>, <code>question</code>, <code>gold_behavior</code>.</li>
+      <li><strong>Rerun <code>python3 eval/run_candidates.py</code></strong> — resumable, so
+        only your new prompts will be judged.</li>
+      <li><strong>Inspect <code>eval/candidate_judgments.jsonl</code></strong> to see whether
+        the judge picked A3 blinded, and read the judge's reason.</li>
+      <li><strong>Regenerate the report</strong> — <code>python3 eval/report.py</code> — and
+        this appendix will refresh with your added evidence.</li>
+    </ol>
+
+    <h3 id="b-summary">B.7 — One-line summary</h3>
     <div class="callout">
       <span class="callout-label">The empirical positioning of GraphRAG in this domain</span>
       <p style="margin: 6px 0 0; font-size: 15px;">
